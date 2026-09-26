@@ -34,6 +34,11 @@ export function apiErrorResponse(error: unknown) {
     console.error(`Anthropic API error ${error.status}:`, error.message);
     return Response.json({ error: "The AI service had a problem. Try again." }, { status: 502 });
   }
+  if (error instanceof Anthropic.AnthropicError) {
+    // Raised by the SDK before any request is sent, e.g. no API key configured.
+    console.error("Anthropic client error:", error.message);
+    return Response.json({ error: "Server is not configured correctly." }, { status: 500 });
+  }
   console.error(error);
   return Response.json({ error: "Something went wrong." }, { status: 500 });
 }
