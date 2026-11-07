@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { daysUntil, formatMoney, maskSensitive, relativeDays } from "./format";
+import { daysUntil, formatMoney, keyDeadline, letterKey, maskSensitive, relativeDays, splitOnReferences } from "./format";
 
 describe("daysUntil", () => {
   const today = new Date(2026, 8, 26, 15, 30);
@@ -34,5 +34,51 @@ describe("maskSensitive", () => {
   it("masks IBANs but keeps other references", () => {
     expect(maskSensitive("PT50 0002 0123 1234 5678 9015 4")).toBe("•••••••••••••••••••••0154");
     expect(maskSensitive("21312 123 456")).toBe("21312 123 456");
+  });
+});
+
+describe("keyDeadline", () => {
+  const today = new Date(2026, 10, 7);
+  it("leads with the next upcoming deadline", () => {
+    const d = keyDeadline(
+      [
+        { date: "2026-11-01", what: "discount ends" },
+        { date: "2026-11-20", what: "pay in full" },
+        { date: "2026-12-01", what: "later" },
+      ],
+      today,
+    );
+    expect(d).toMatchObject({ date: "2026-11-20", days: 13, overdue: false });
+  });
+  it("is overdue when every deadline has passed, using the latest one", () => {
+    const d = keyDeadline(
+      [
+        { date: "2026-10-01", what: "first" },
+        { date: "2026-10-31", what: "pay" },
+      ],
+      today,
+    );
+    expect(d).toMatchObject({ date: "2026-10-31", days: -7, overdue: true });
+  });
+  it("ignores undated entries", () => {
+    expect(keyDeadline([{ date: "within 15 days", what: "reply" }], today)).toBeNull();
+  });
+});
+
+describe("splitOnReferences", () => {
+  it("finds references regardless of spacing", () => {
+    const parts = splitOnReferences("Pay with Entidade 21312 and Referência 481293776 at an ATM.", ["21312", "481 293 776"]);
+    expect(parts.filter((p) => p.ref).map((p) => p.text)).toEqual(["21312", "481293776"]);
+    expect(parts.map((p) => p.text).join("")).toBe("Pay with Entidade 21312 and Referência 481293776 at an ATM.");
+  });
+  it("leaves text alone when there is nothing to match", () => {
+    expect(splitOnReferences("Call them.", ["12"])).toEqual([{ text: "Call them.", ref: false }]);
+  });
+});
+
+describe("letterKey", () => {
+  it("is stable and differs between letters", () => {
+    expect(letterKey(["a", "b"])).toBe(letterKey(["a", "b"]));
+    expect(letterKey(["a", "b"])).not.toBe(letterKey(["a", "c"]));
   });
 });

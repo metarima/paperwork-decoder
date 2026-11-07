@@ -5,6 +5,17 @@ import type { LetterAnalysis } from "./schema";
 
 export type DecodeResponse = { analysis: LetterAnalysis; usage: DecodeUsage | null };
 
+// Carries the HTTP status so the UI can pick the right error screen
+// (busy service, file too large, unreadable letter).
+export class RequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
 const MAX_IMAGE_SIDE = 2000;
 
 // Phone photos are often 4000px+ and several MB. The model doesn't benefit from
@@ -29,7 +40,7 @@ export async function decodeFile(file: File, language: string): Promise<DecodeRe
   form.append("language", language);
   const res = await fetch("/api/decode", { method: "POST", body: form });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error ?? "Something went wrong.");
+  if (!res.ok) throw new RequestError(body.error ?? "Something went wrong.", res.status);
   return body as DecodeResponse;
 }
 
@@ -43,7 +54,7 @@ export async function streamText(url: string, payload: unknown, onText: (text: s
   });
   if (!res.ok || !res.body) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? "Something went wrong.");
+    throw new RequestError(body.error ?? "Something went wrong.", res.status);
   }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();

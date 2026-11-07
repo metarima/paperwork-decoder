@@ -209,4 +209,38 @@ Os Serviços`,
       amounts: [{ value: 90, currency: "EUR" }],
     },
   },
+  {
+    id: "pt-employment-contract",
+    title: "Portuguese employment contract",
+    letter: {
+      letterhead: ["LUSOTEC SOLUÇÕES, LDA. (FICTÍCIA)", "Rua da Amostra, 88 · 1000-000 Lisboa"],
+      date: "Lisboa, 2 de novembro de 2026",
+      body: `Exmo. Sr. Daniel Exemplo
+Rua do Teste, 21, 3.º Dto.
+1100-200 Lisboa
+
+CONTRATO DE TRABALHO SEM TERMO
+
+Entre Lusotec Soluções, Lda., adiante designada Empregadora, e Daniel Exemplo, adiante designado Trabalhador, é celebrado o presente contrato de trabalho, que se rege pelas cláusulas seguintes.
+
+Cláusula 1.ª — Funções: o Trabalhador é admitido para exercer as funções de Analista de Dados.
+Cláusula 2.ª — Início: o contrato produz efeitos a partir de 1 de dezembro de 2026.
+Cláusula 3.ª — Período experimental: 180 dias, durante os quais qualquer das partes pode denunciar o contrato sem aviso prévio nem indemnização.
+Cláusula 4.ª — Retribuição: 2.150,00 € ilíquidos mensais, pagos 14 vezes por ano, acrescidos de subsídio de refeição de 10,20 € por dia útil.
+Cláusula 5.ª — Horário: 40 horas semanais, de segunda a sexta-feira, podendo ser adaptado em regime de banco de horas.
+Cláusula 6.ª — Denúncia: o Trabalhador pode denunciar o contrato mediante aviso prévio de 30 ou 60 dias, conforme tenha até dois anos ou mais de dois anos de antiguidade.
+Cláusula 7.ª — Não concorrência: durante 12 meses após a cessação do contrato, o Trabalhador não pode exercer atividade concorrente em território nacional.
+
+Solicitamos a devolução de um exemplar assinado até 20 de novembro de 2026.
+
+Com os melhores cumprimentos,
+Departamento de Recursos Humanos`,
+    },
+    expected: {
+      language: "Portuguese",
+      urgency: "medium",
+      deadlines: ["2026-11-20", "2026-12-01"],
+      amounts: [{ value: 2150, currency: "EUR" }],
+    },
+  },
 ];

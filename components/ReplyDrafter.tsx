@@ -4,21 +4,23 @@ import { useEffect, useRef, useState } from "react";
 import { streamText } from "@/lib/client";
 import type { ReplyIntent } from "@/lib/prompts";
 import type { LetterAnalysis } from "@/lib/schema";
+import { button, card, CopyButton, Spinner } from "./ui";
 
-const INTENTS: { id: ReplyIntent; label: string }[] = [
-  { id: "pay", label: "I'll pay" },
-  { id: "dispute", label: "Dispute it" },
-  { id: "extension", label: "Ask for more time" },
-  { id: "info", label: "Ask a question" },
+const INTENTS: { id: ReplyIntent; label: string; hint: string }[] = [
+  { id: "pay", label: "I'll pay", hint: "Confirm payment and ask for a receipt" },
+  { id: "dispute", label: "Dispute it", hint: "Say it's wrong and ask for a review" },
+  { id: "extension", label: "Ask for more time", hint: "Request a later deadline" },
+  { id: "info", label: "Ask a question", hint: "Ask them to explain something" },
 ];
 
-export default function ReplyDrafter({ analysis }: { analysis: LetterAnalysis }) {
-  const [intent, setIntent] = useState<ReplyIntent | null>(null);
+export type ReplyPreview = { intent: ReplyIntent; text: string; busy?: boolean };
+
+export default function ReplyDrafter({ analysis, initial }: { analysis: LetterAnalysis; initial?: ReplyPreview }) {
+  const [intent, setIntent] = useState<ReplyIntent | null>(initial?.intent ?? null);
   const [notes, setNotes] = useState("");
-  const [text, setText] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [text, setText] = useState(initial?.text ?? "");
+  const [busy, setBusy] = useState(initial?.busy ?? false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -40,64 +42,134 @@ export default function ReplyDrafter({ analysis }: { analysis: LetterAnalysis })
     }
   }
 
-  const [reply, translation] = text.split(/\n-{3,}\n/);
+  const [reply = "", translation] = text.split(/\n-{3,}\n/);
+  const sameLanguage = /^english$/i.test(analysis.language.trim());
+  const hasPlaceholders = /\[[^\]]+\]/.test(reply);
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-      <h3 className="text-lg font-semibold">Draft a reply</h3>
-      <p className="mt-1 text-sm text-muted">Written in {analysis.language}, with an English translation.</p>
+    <section id="reply" aria-labelledby="reply-title" className={`${card} scroll-mt-6 p-5 sm:p-6`}>
+      <h2 id="reply-title" className="text-xl font-semibold tracking-[-0.01em]">
+        Draft a reply
+      </h2>
+      <p className="mt-1 text-[15px] text-muted">
+        {sameLanguage
+          ? "A short, polite reply you can send as it is."
+          : `Written in ${analysis.language}, the letter's language, with an English translation for you.`}
+      </p>
 
-      <textarea
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        maxLength={1000}
-        rows={2}
-        placeholder="Anything to add? e.g. “I already paid on 3 October”, “I was abroad when this was sent”"
-        className="mt-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-      />
+      <label className="mt-5 block">
+        <span className="text-[15px] font-medium">
+          Anything they should know? <span className="font-normal text-muted">(optional)</span>
+        </span>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          maxLength={1000}
+          rows={2}
+          placeholder="e.g. I already paid on 3 October"
+          className="mt-2 block w-full resize-y rounded-xl border border-border-strong bg-surface px-3.5 py-3 text-[16px] leading-snug placeholder:text-muted hover:border-accent"
+        />
+      </label>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        {INTENTS.map((i) => (
-          <button
-            key={i.id}
-            onClick={() => draft(i.id)}
-            disabled={busy}
-            className={`rounded-full border px-3 py-1.5 text-sm disabled:opacity-50 ${
-              intent === i.id ? "border-accent bg-accent-soft text-accent" : "border-border hover:border-accent"
-            }`}
-          >
-            {i.label}
-          </button>
-        ))}
-      </div>
-
-      {error && <p className="mt-4 text-sm text-high">{error}</p>}
-
-      {text && (
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <div className="relative rounded-lg bg-background p-4">
-            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{reply}</pre>
-            {!busy && (
+      <fieldset className="mt-5">
+        <legend className="text-[15px] font-medium">What do you want to say?</legend>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {INTENTS.map((i) => {
+            const selected = intent === i.id;
+            return (
               <button
-                onClick={async () => {
-                  await navigator.clipboard.writeText(reply.trim());
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 1500);
-                }}
-                className="mt-3 rounded-md border border-border px-2 py-1 text-xs hover:border-accent"
+                key={i.id}
+                type="button"
+                onClick={() => draft(i.id)}
+                disabled={busy && !selected}
+                aria-pressed={selected}
+                className={`flex min-h-16 items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors disabled:opacity-50 ${
+                  selected ? "border-accent bg-accent-soft" : "border-border-strong/60 bg-surface hover:border-accent"
+                }`}
               >
-                {copied ? "Copied" : "Copy reply"}
+                <span>
+                  <span className={`block text-[16px] font-semibold ${selected ? "text-accent" : ""}`}>{i.label}</span>
+                  <span className="block text-sm text-muted">{i.hint}</span>
+                </span>
+                {selected && busy && <Spinner className="text-accent" />}
               </button>
+            );
+          })}
+        </div>
+      </fieldset>
+
+      {error && (
+        <p role="alert" className="mt-4 rounded-xl bg-high-soft px-4 py-3 text-[15px] text-high">
+          {error}
+        </p>
+      )}
+
+      {(text || busy) && (
+        <div className="mt-6 animate-rise" aria-live="polite" aria-busy={busy}>
+          <div className={`grid gap-3 ${sameLanguage ? "" : "sm:grid-cols-2"}`}>
+            <div className="flex flex-col rounded-xl border border-border-strong/60 bg-surface">
+              <div className="flex min-h-14 items-center justify-between gap-3 border-b border-border py-1.5 pr-1.5 pl-4">
+                <p className="text-sm">
+                  <span className="font-semibold">{analysis.language}</span>
+                  <span className="text-muted"> · to send</span>
+                </p>
+                {busy ? (
+                  <span className="flex min-h-11 items-center gap-2 px-3 text-sm text-muted">
+                    <Spinner className="size-3.5" /> Writing…
+                  </span>
+                ) : (
+                  <CopyButton value={reply.trim()} label="Copy reply" />
+                )}
+              </div>
+              <div className="px-4 py-4 text-[15px] leading-relaxed whitespace-pre-wrap">
+                {reply ? withPlaceholders(reply.trim()) : <span className="text-muted">Starting…</span>}
+              </div>
+            </div>
+
+            {!sameLanguage && (
+              <div className="flex flex-col rounded-xl bg-surface-2">
+                <div className="flex min-h-14 items-center border-b border-border px-4">
+                  <p className="text-sm">
+                    <span className="font-semibold">English</span>
+                    <span className="text-muted"> · for you to read</span>
+                  </p>
+                </div>
+                <div className="px-4 py-4 text-[15px] leading-relaxed whitespace-pre-wrap">
+                  {translation?.trim() ? (
+                    withPlaceholders(translation.trim())
+                  ) : (
+                    <span className="text-muted">The translation appears when the reply is written.</span>
+                  )}
+                </div>
+              </div>
             )}
           </div>
-          {translation !== undefined && (
-            <div className="rounded-lg border border-dashed border-border p-4">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">English translation</p>
-              <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-muted">{translation.trim()}</pre>
-            </div>
+          {!busy && hasPlaceholders && (
+            <p className="mt-3 flex items-center gap-2 text-sm text-muted">
+              <span aria-hidden className="mark mark-money h-4 w-6" />
+              Fill in the highlighted parts before you send it.
+            </p>
+          )}
+          {!busy && intent && (
+            <button type="button" onClick={() => draft(intent)} className={`${button.small} mt-4`}>
+              Write it again
+            </button>
           )}
         </div>
       )}
     </section>
+  );
+}
+
+// Highlights [placeholders] such as [Your name] so they aren't sent unfilled.
+function withPlaceholders(text: string) {
+  return text.split(/(\[[^\]\n]+\])/g).map((part, i) =>
+    /^\[[^\]]+\]$/.test(part) ? (
+      <span key={i} className="mark mark-money font-medium">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
   );
 }

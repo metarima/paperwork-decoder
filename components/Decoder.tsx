@@ -1,164 +1,172 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { type DecodeResponse, decodeFile } from "@/lib/client";
-import { SAMPLES, type Sample } from "@/lib/samples";
-import { ACCEPTED_TYPES, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from "@/lib/schema";
-import FollowUpChat from "./FollowUpChat";
-import ReplyDrafter from "./ReplyDrafter";
+import { type DecodeResponse, decodeFile, RequestError } from "@/lib/client";
+import type { Sample } from "@/lib/samples";
+import { ACCEPTED_TYPES, MAX_UPLOAD_BYTES } from "@/lib/schema";
+import FollowUpChat, { type Message } from "./FollowUpChat";
+import { ClosingBand, Hero, HOME_LINKS, HowSection, LetterPreview, LettersSection, PrivacySection, UploadPanel } from "./Home";
+import { ArrowLeftIcon, LetterMark } from "./icons";
+import ReplyDrafter, { type ReplyPreview } from "./ReplyDrafter";
 import ResultCard from "./ResultCard";
+import { ErrorPanel, type ErrorKind, errorKind, LoadingView } from "./Status";
+import { button } from "./ui";
 
-const LANGUAGES = ["English", "Português", "Español", "Français", "Deutsch", "Italiano", "Українська"];
-
-type State =
+export type DecoderState =
   | { status: "idle" }
-  | { status: "loading"; label: string }
+  | { status: "loading"; source: string; initialElapsed?: number }
   | { status: "done"; result: DecodeResponse; source: string; cached: boolean }
-  | { status: "error"; message: string };
+  | { status: "error"; kind: ErrorKind; message: string };
 
-export default function Decoder() {
-  const [state, setState] = useState<State>({ status: "idle" });
+// Lets the dev-only /preview route open the reply and chat mid-conversation.
+export type DecoderDemo = { reply?: ReplyPreview; chat?: Message[] };
+
+export default function Decoder({ initialState, demo }: { initialState?: DecoderState; demo?: DecoderDemo }) {
+  const [state, setState] = useState<DecoderState>(initialState ?? { status: "idle" });
   const [language, setLanguage] = useState("English");
-  const [dragging, setDragging] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const runId = useRef(0);
+  const lastRun = useRef<(() => void) | null>(null);
+
+  function show(next: DecoderState) {
+    setState(next);
+    window.scrollTo({ top: 0 });
+  }
+
+  function fail(error: unknown) {
+    const status = error instanceof RequestError ? error.status : undefined;
+    show({ status: "error", kind: errorKind(status), message: error instanceof Error ? error.message : "Something went wrong." });
+  }
 
   async function run(file: File, source: string) {
+    lastRun.current = () => run(file, source);
     if (!(ACCEPTED_TYPES as readonly string[]).includes(file.type)) {
-      setState({ status: "error", message: "Upload a JPG, PNG, WebP or PDF." });
+      show({ status: "error", kind: "fileType", message: "Upload a JPG, PNG, WebP or PDF." });
       return;
     }
+    // Photos are shrunk before upload, so only PDFs can be too big here.
     if (file.size > MAX_UPLOAD_BYTES && file.type === "application/pdf") {
-      setState({ status: "error", message: `That PDF is over ${MAX_UPLOAD_MB}MB.` });
+      show({ status: "error", kind: "tooLarge", message: "That file is too big." });
       return;
     }
-    setState({ status: "loading", label: `Reading ${source}…` });
+    const id = ++runId.current;
+    show({ status: "loading", source });
     try {
       const result = await decodeFile(file, language);
-      setState({ status: "done", result, source, cached: false });
+      if (id === runId.current) show({ status: "done", result, source, cached: false });
     } catch (error) {
-      setState({ status: "error", message: error instanceof Error ? error.message : "Something went wrong." });
+      if (id === runId.current) fail(error);
     }
   }
 
   async function runSample(sample: Sample) {
-    setState({ status: "loading", label: `Reading ${sample.title}…` });
+    lastRun.current = () => runSample(sample);
+    const id = ++runId.current;
+    show({ status: "loading", source: sample.title });
     // Prefer the pre-computed result so the demo is instant and free. Fall back
     // to a live decode of the sample PDF if it hasn't been generated yet.
     if (language === "English") {
       const cached = await fetch(`/samples/${sample.id}.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      if (id !== runId.current) return;
       if (cached?.analysis) {
-        setState({ status: "done", result: cached, source: sample.title, cached: true });
+        show({ status: "done", result: cached, source: sample.title, cached: true });
         return;
       }
     }
-    const blob = await fetch(`/samples/${sample.id}.pdf`).then((r) => r.blob());
-    await run(new File([blob], `${sample.id}.pdf`, { type: "application/pdf" }), sample.title);
+    try {
+      const blob = await fetch(`/samples/${sample.id}.pdf`).then((r) => r.blob());
+      if (id !== runId.current) return;
+      await run(new File([blob], `${sample.id}.pdf`, { type: "application/pdf" }), sample.title);
+    } catch (error) {
+      if (id === runId.current) fail(error);
+    }
   }
 
-  const busy = state.status === "loading";
+  function reset() {
+    runId.current++;
+    show({ status: "idle" });
+  }
+
+  const onFile = (file: File) => run(file, file.name);
+  const home = state.status === "idle" || state.status === "error";
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-2xl border border-border bg-surface p-5 sm:p-6">
-        <div
-          role="button"
-          tabIndex={0}
-          aria-disabled={busy}
-          onClick={() => !busy && inputRef.current?.click()}
-          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && !busy && inputRef.current?.click()}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            const file = e.dataTransfer.files[0];
-            if (file && !busy) run(file, file.name);
-          }}
-          className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-10 text-center transition-colors ${
-            dragging ? "border-accent bg-accent-soft" : "border-border hover:border-accent"
-          } ${busy ? "pointer-events-none opacity-60" : ""}`}
-        >
-          <svg aria-hidden width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-3 text-accent">
-            <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
-            <path d="M14 3v5h5M9 13h6M9 17h4" />
-          </svg>
-          <p className="font-medium">Take a photo or drop a letter here</p>
-          <p className="mt-1 text-sm text-muted">JPG, PNG or PDF, up to {MAX_UPLOAD_MB}MB</p>
-          <input
-            ref={inputRef}
-            type="file"
-            accept={ACCEPTED_TYPES.join(",")}
-            capture="environment"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              if (file) run(file, file.name);
-            }}
-          />
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-          <label className="flex items-center gap-2">
-            <span className="text-muted">Explain in</span>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="rounded-md border border-border bg-surface px-2 py-1"
-            >
-              {LANGUAGES.map((l) => (
-                <option key={l}>{l}</option>
-              ))}
-            </select>
-          </label>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-muted">No letter handy? Try:</span>
-            {SAMPLES.map((s) => (
-              <button
-                key={s.id}
-                disabled={busy}
-                onClick={() => runSample(s)}
-                className="rounded-full border border-border px-3 py-1 hover:border-accent hover:text-accent disabled:opacity-50"
-              >
-                {s.flag} {s.short}
-              </button>
+    <div className={`flex min-h-dvh flex-col ${state.status === "done" ? "pb-24 sm:pb-0" : ""}`}>
+      <header className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-5">
+        <button type="button" onClick={reset} className="-ml-2 flex min-h-11 items-center gap-2 rounded-xl px-2 text-[16px] font-semibold tracking-[-0.01em]">
+          <LetterMark />
+          Paperwork Decoder
+        </button>
+        {home && (
+          <nav aria-label="Page sections" className="-mr-3 hidden items-center md:flex">
+            {HOME_LINKS.map((l) => (
+              <a key={l.href} href={l.href} className="flex min-h-11 items-center rounded-xl px-3 text-[15px] text-muted transition-colors hover:text-foreground">
+                {l.label}
+              </a>
             ))}
+          </nav>
+        )}
+        {!home && (
+          <button type="button" onClick={reset} className={button.small}>
+            <ArrowLeftIcon size={18} />
+            New letter
+          </button>
+        )}
+      </header>
+
+      <main className="flex-1">
+        {home && (
+          <>
+            <div className="mx-auto grid max-w-6xl gap-12 px-4 pt-6 pb-16 sm:px-6 sm:pt-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] lg:gap-20 lg:pt-16 lg:pb-24">
+              <div className="space-y-8">
+                <Hero />
+                {state.status === "error" && (
+                  <ErrorPanel kind={state.kind} detail={state.message} onRetry={() => lastRun.current?.()} onFile={onFile} />
+                )}
+                <UploadPanel busy={false} language={language} onLanguage={setLanguage} onFile={onFile} onSample={runSample} />
+              </div>
+              <LetterPreview />
+            </div>
+            <LettersSection />
+            <HowSection />
+            <PrivacySection />
+            <ClosingBand onFile={onFile} />
+          </>
+        )}
+
+        {state.status === "loading" && (
+          <div className="px-4 pt-8 pb-16 sm:px-6 sm:pt-16">
+            <LoadingView source={state.source} language={language} initialElapsed={state.initialElapsed} />
           </div>
+        )}
+
+        {state.status === "done" && (
+          <div className="mx-auto max-w-3xl space-y-5 px-4 pt-4 pb-12 sm:px-6 sm:pt-6">
+            <ResultCard analysis={state.result.analysis} usage={state.result.usage} cached={state.cached} />
+            <div className="space-y-5 pt-6">
+              <ReplyDrafter analysis={state.result.analysis} initial={demo?.reply} />
+              <FollowUpChat key={state.source} analysis={state.result.analysis} initialMessages={demo?.chat} />
+            </div>
+          </div>
+        )}
+      </main>
+
+      <footer className={`mx-auto w-full px-4 pb-10 sm:px-6 ${home ? "max-w-6xl" : state.status === "loading" ? "max-w-lg" : "max-w-3xl"}`}>
+        <div className="flex flex-col gap-4 border-t border-border pt-6 sm:flex-row sm:items-start sm:justify-between sm:gap-10">
+          <p className="max-w-xl text-sm leading-relaxed text-muted">
+            Not legal or financial advice. Always check the original letter. Files are sent to an AI model to be read and
+            aren&apos;t stored by this app.
+          </p>
+          {home && (
+            <nav aria-label="Footer" className="-ml-3 flex flex-wrap sm:-mr-3 sm:ml-0">
+              {HOME_LINKS.map((l) => (
+                <a key={l.href} href={l.href} className="flex min-h-11 items-center px-3 text-sm text-muted hover:text-foreground">
+                  {l.label}
+                </a>
+              ))}
+            </nav>
+          )}
         </div>
-      </section>
-
-      {state.status === "loading" && <LoadingCard label={state.label} />}
-
-      {state.status === "error" && (
-        <div role="alert" className="rounded-xl border border-high bg-high-soft px-4 py-3 text-high">
-          {state.message}
-        </div>
-      )}
-
-      {state.status === "done" && (
-        <>
-          <ResultCard analysis={state.result.analysis} usage={state.result.usage} cached={state.cached} />
-          <ReplyDrafter analysis={state.result.analysis} />
-          <FollowUpChat key={state.source} analysis={state.result.analysis} />
-        </>
-      )}
-    </div>
-  );
-}
-
-function LoadingCard({ label }: { label: string }) {
-  return (
-    <div aria-live="polite" className="rounded-2xl border border-border bg-surface p-6">
-      <p className="font-medium">{label}</p>
-      <p className="mt-1 text-sm text-muted">Finding deadlines, amounts and what you need to do. This takes 10 to 30 seconds.</p>
-      <div className="mt-4 space-y-2">
-        {[80, 60, 70].map((w) => (
-          <div key={w} className="h-3 animate-pulse rounded bg-border" style={{ width: `${w}%` }} />
-        ))}
-      </div>
+      </footer>
     </div>
   );
 }
