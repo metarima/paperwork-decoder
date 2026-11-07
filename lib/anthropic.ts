@@ -18,7 +18,7 @@ export function estimateCostUsd(model: string, inputTokens: number, outputTokens
 }
 
 // Maps SDK errors to something safe to show in the UI.
-export function apiErrorResponse(error: unknown) {
+export function anthropicErrorResponse(error: unknown) {
   if (error instanceof Anthropic.RateLimitError) {
     return Response.json({ error: "The AI service is busy. Try again in a minute." }, { status: 429 });
   }

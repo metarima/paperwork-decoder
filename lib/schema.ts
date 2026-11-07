@@ -46,7 +46,9 @@ export type LetterAnalysis = z.infer<typeof LetterAnalysisSchema>;
 export const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"] as const;
 export type AcceptedType = (typeof ACCEPTED_TYPES)[number];
 
-export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+// Vercel rejects request bodies over 4.5MB, so stay safely under that.
+export const MAX_UPLOAD_MB = 4;
+export const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 
 export function isAcceptedType(type: string): type is AcceptedType {
   return (ACCEPTED_TYPES as readonly string[]).includes(type);

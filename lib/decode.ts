@@ -1,7 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { FinishReason } from "@google/genai";
+import { z } from "zod";
 import { anthropic, DECODE_MODEL, estimateCostUsd } from "./anthropic";
+import { gemini, GEMINI_DECODE_MODEL } from "./gemini";
 import { decodeSystemPrompt } from "./prompts";
+import { getProvider } from "./provider";
 import { type AcceptedType, type LetterAnalysis, LetterAnalysisSchema } from "./schema";
 
 export type DecodeUsage = {
@@ -16,8 +20,16 @@ export type DecodeResult =
   | { ok: true; analysis: LetterAnalysis; usage: DecodeUsage }
   | { ok: false; reason: "refusal" | "unparseable" };
 
+const USER_PROMPT = "Here's the letter I received. What does it mean and what do I need to do?";
+
 // Shared by the API route and the eval runner so both exercise the same prompt.
 export async function decodeLetter(base64: string, mediaType: AcceptedType, explainIn = "English"): Promise<DecodeResult> {
+  return getProvider() === "gemini"
+    ? decodeWithGemini(base64, mediaType, explainIn)
+    : decodeWithClaude(base64, mediaType, explainIn);
+}
+
+async function decodeWithClaude(base64: string, mediaType: AcceptedType, explainIn: string): Promise<DecodeResult> {
   const letter: Anthropic.ContentBlockParam =
     mediaType === "application/pdf"
       ? { type: "document", source: { type: "base64", media_type: mediaType, data: base64 } }
@@ -30,12 +42,7 @@ export async function decodeLetter(base64: string, mediaType: AcceptedType, expl
     thinking: { type: "adaptive" },
     output_config: { effort: "medium", format: zodOutputFormat(LetterAnalysisSchema) },
     system: decodeSystemPrompt(explainIn),
-    messages: [
-      {
-        role: "user",
-        content: [letter, { type: "text", text: "Here's the letter I received. What does it mean and what do I need to do?" }],
-      },
-    ],
+    messages: [{ role: "user", content: [letter, { type: "text", text: USER_PROMPT }] }],
   });
 
   if (response.stop_reason === "refusal") return { ok: false, reason: "refusal" };
@@ -50,6 +57,57 @@ export async function decodeLetter(base64: string, mediaType: AcceptedType, expl
       inputTokens: input_tokens,
       outputTokens: output_tokens,
       costUsd: estimateCostUsd(DECODE_MODEL, input_tokens, output_tokens),
+      ms: Date.now() - started,
+    },
+  };
+}
+
+// JSON Schema sent to Gemini for constrained output. "$schema" is dropped
+// because Gemini only accepts the schema body itself.
+export function letterJsonSchema() {
+  const schema = z.toJSONSchema(LetterAnalysisSchema) as Record<string, unknown>;
+  delete schema.$schema;
+  return schema;
+}
+
+const BLOCKED: string[] = [FinishReason.SAFETY, FinishReason.PROHIBITED_CONTENT, FinishReason.BLOCKLIST, FinishReason.SPII];
+
+async function decodeWithGemini(base64: string, mediaType: AcceptedType, explainIn: string): Promise<DecodeResult> {
+  const started = Date.now();
+  const response = await gemini().models.generateContent({
+    model: GEMINI_DECODE_MODEL,
+    contents: [{ role: "user", parts: [{ inlineData: { mimeType: mediaType, data: base64 } }, { text: USER_PROMPT }] }],
+    config: {
+      systemInstruction: decodeSystemPrompt(explainIn),
+      maxOutputTokens: 16000,
+      responseMimeType: "application/json",
+      responseJsonSchema: letterJsonSchema(),
+    },
+  });
+
+  const finish = response.candidates?.[0]?.finishReason;
+  if (response.promptFeedback?.blockReason || (finish && BLOCKED.includes(finish))) return { ok: false, reason: "refusal" };
+  if (finish === FinishReason.MAX_TOKENS || !response.text) return { ok: false, reason: "unparseable" };
+
+  // Gemini enforces the schema's shape, but we still validate before trusting it.
+  let json: unknown;
+  try {
+    json = JSON.parse(response.text);
+  } catch {
+    return { ok: false, reason: "unparseable" };
+  }
+  const parsed = LetterAnalysisSchema.safeParse(json);
+  if (!parsed.success) return { ok: false, reason: "unparseable" };
+
+  const usage = response.usageMetadata;
+  return {
+    ok: true,
+    analysis: parsed.data,
+    usage: {
+      model: GEMINI_DECODE_MODEL,
+      inputTokens: usage?.promptTokenCount ?? 0,
+      outputTokens: (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0),
+      costUsd: null,
       ms: Date.now() - started,
     },
   };

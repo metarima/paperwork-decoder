@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { type DecodeResponse, decodeFile } from "@/lib/client";
 import { SAMPLES, type Sample } from "@/lib/samples";
-import { ACCEPTED_TYPES, MAX_UPLOAD_BYTES } from "@/lib/schema";
+import { ACCEPTED_TYPES, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from "@/lib/schema";
 import FollowUpChat from "./FollowUpChat";
 import ReplyDrafter from "./ReplyDrafter";
 import ResultCard from "./ResultCard";
@@ -28,7 +28,7 @@ export default function Decoder() {
       return;
     }
     if (file.size > MAX_UPLOAD_BYTES && file.type === "application/pdf") {
-      setState({ status: "error", message: "That PDF is over 10MB." });
+      setState({ status: "error", message: `That PDF is over ${MAX_UPLOAD_MB}MB.` });
       return;
     }
     setState({ status: "loading", label: `Reading ${source}…` });
@@ -86,7 +86,7 @@ export default function Decoder() {
             <path d="M14 3v5h5M9 13h6M9 17h4" />
           </svg>
           <p className="font-medium">Take a photo or drop a letter here</p>
-          <p className="mt-1 text-sm text-muted">JPG, PNG or PDF, up to 10MB</p>
+          <p className="mt-1 text-sm text-muted">JPG, PNG or PDF, up to {MAX_UPLOAD_MB}MB</p>
           <input
             ref={inputRef}
             type="file"

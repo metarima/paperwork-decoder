@@ -1,7 +1,7 @@
-import { apiErrorResponse } from "@/lib/anthropic";
+import { apiErrorResponse } from "@/lib/provider";
 import { decodeLetter } from "@/lib/decode";
 import { checkRateLimit, clientKey, rateLimitedResponse } from "@/lib/rate-limit";
-import { isAcceptedType, MAX_UPLOAD_BYTES } from "@/lib/schema";
+import { isAcceptedType, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from "@/lib/schema";
 
 export const maxDuration = 60;
 
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Upload a JPG, PNG, WebP or PDF." }, { status: 415 });
   }
   if (file.size > MAX_UPLOAD_BYTES) {
-    return Response.json({ error: "That file is over 10MB." }, { status: 413 });
+    return Response.json({ error: `That file is over ${MAX_UPLOAD_MB}MB.` }, { status: 413 });
   }
 
   try {

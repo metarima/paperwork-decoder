@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { anthropic, FAST_MODEL } from "@/lib/anthropic";
+import { gemini, GEMINI_FAST_MODEL } from "@/lib/gemini";
 import { replySystemPrompt } from "@/lib/prompts";
+import { getProvider } from "@/lib/provider";
 import { checkRateLimit, clientKey, rateLimitedResponse } from "@/lib/rate-limit";
 import { LetterAnalysisSchema } from "@/lib/schema";
-import { textStreamResponse } from "@/lib/stream";
+import { geminiTextStreamResponse, textStreamResponse } from "@/lib/stream";
 
 const ReplyRequest = z.object({
   analysis: LetterAnalysisSchema,
@@ -20,19 +22,26 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request." }, { status: 400 });
   }
   const { analysis, intent, notes } = parsed.data;
+  const system = replySystemPrompt(intent, analysis.language);
+  const prompt = `Letter analysis:\n${JSON.stringify(analysis, null, 2)}${
+    notes ? `\n\nExtra context from me: ${notes}` : ""
+  }\n\nPlease draft the reply.`;
+
+  if (getProvider() === "gemini") {
+    return geminiTextStreamResponse(() =>
+      gemini().models.generateContentStream({
+        model: GEMINI_FAST_MODEL,
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        config: { systemInstruction: system, maxOutputTokens: 4000 },
+      }),
+    );
+  }
 
   const stream = anthropic.messages.stream({
     model: FAST_MODEL,
     max_tokens: 4000,
-    system: replySystemPrompt(intent, analysis.language),
-    messages: [
-      {
-        role: "user",
-        content: `Letter analysis:\n${JSON.stringify(analysis, null, 2)}${
-          notes ? `\n\nExtra context from me: ${notes}` : ""
-        }\n\nPlease draft the reply.`,
-      },
-    ],
+    system,
+    messages: [{ role: "user", content: prompt }],
   });
   return textStreamResponse(stream);
 }

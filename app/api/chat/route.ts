@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { anthropic, FAST_MODEL } from "@/lib/anthropic";
+import { gemini, GEMINI_FAST_MODEL } from "@/lib/gemini";
 import { CHAT_SYSTEM_PROMPT } from "@/lib/prompts";
+import { getProvider } from "@/lib/provider";
 import { checkRateLimit, clientKey, rateLimitedResponse } from "@/lib/rate-limit";
 import { LetterAnalysisSchema } from "@/lib/schema";
-import { textStreamResponse } from "@/lib/stream";
+import { geminiTextStreamResponse, textStreamResponse } from "@/lib/stream";
 
 const ChatRequest = z.object({
   analysis: LetterAnalysisSchema,
@@ -22,6 +24,17 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request." }, { status: 400 });
   }
   const { analysis, messages } = parsed.data;
+  const analysisText = `Letter analysis:\n${JSON.stringify(analysis, null, 2)}`;
+
+  if (getProvider() === "gemini") {
+    return geminiTextStreamResponse(() =>
+      gemini().models.generateContentStream({
+        model: GEMINI_FAST_MODEL,
+        contents: messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
+        config: { systemInstruction: `${CHAT_SYSTEM_PROMPT}\n\n${analysisText}`, maxOutputTokens: 2000 },
+      }),
+    );
+  }
 
   const stream = anthropic.messages.stream({
     model: FAST_MODEL,
@@ -32,7 +45,7 @@ export async function POST(request: Request) {
       { type: "text", text: CHAT_SYSTEM_PROMPT },
       {
         type: "text",
-        text: `Letter analysis:\n${JSON.stringify(analysis, null, 2)}`,
+        text: analysisText,
         cache_control: { type: "ephemeral" },
       },
     ],
