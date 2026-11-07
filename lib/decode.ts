@@ -3,7 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { FinishReason } from "@google/genai";
 import { z } from "zod";
 import { anthropic, DECODE_MODEL, estimateCostUsd } from "./anthropic";
-import { gemini, GEMINI_DECODE_MODEL } from "./gemini";
+import { gemini, GEMINI_DECODE_FALLBACK, GEMINI_DECODE_MODEL, withGeminiFallback } from "./gemini";
 import { decodeSystemPrompt } from "./prompts";
 import { getProvider } from "./provider";
 import { type AcceptedType, type LetterAnalysis, LetterAnalysisSchema } from "./schema";
@@ -74,16 +74,18 @@ const BLOCKED: string[] = [FinishReason.SAFETY, FinishReason.PROHIBITED_CONTENT,
 
 async function decodeWithGemini(base64: string, mediaType: AcceptedType, explainIn: string): Promise<DecodeResult> {
   const started = Date.now();
-  const response = await gemini().models.generateContent({
-    model: GEMINI_DECODE_MODEL,
-    contents: [{ role: "user", parts: [{ inlineData: { mimeType: mediaType, data: base64 } }, { text: USER_PROMPT }] }],
-    config: {
-      systemInstruction: decodeSystemPrompt(explainIn),
-      maxOutputTokens: 16000,
-      responseMimeType: "application/json",
-      responseJsonSchema: letterJsonSchema(),
-    },
-  });
+  const { model, result: response } = await withGeminiFallback([GEMINI_DECODE_MODEL, GEMINI_DECODE_FALLBACK], (model) =>
+    gemini().models.generateContent({
+      model,
+      contents: [{ role: "user", parts: [{ inlineData: { mimeType: mediaType, data: base64 } }, { text: USER_PROMPT }] }],
+      config: {
+        systemInstruction: decodeSystemPrompt(explainIn),
+        maxOutputTokens: 16000,
+        responseMimeType: "application/json",
+        responseJsonSchema: letterJsonSchema(),
+      },
+    }),
+  );
 
   const finish = response.candidates?.[0]?.finishReason;
   if (response.promptFeedback?.blockReason || (finish && BLOCKED.includes(finish))) return { ok: false, reason: "refusal" };
@@ -104,7 +106,7 @@ async function decodeWithGemini(base64: string, mediaType: AcceptedType, explain
     ok: true,
     analysis: parsed.data,
     usage: {
-      model: GEMINI_DECODE_MODEL,
+      model,
       inputTokens: usage?.promptTokenCount ?? 0,
       outputTokens: (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0),
       costUsd: null,

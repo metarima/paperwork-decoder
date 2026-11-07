@@ -10,6 +10,7 @@ vi.mock("./gemini", async (importOriginal) => {
 });
 
 const { decodeLetter, letterJsonSchema } = await import("./decode");
+const { withGeminiFallback } = await import("./gemini");
 const { geminiTextStreamResponse } = await import("./stream");
 
 const analysis: LetterAnalysis = {
@@ -94,5 +95,30 @@ describe("geminiTextStreamResponse", () => {
       throw new TypeError("fetch failed");
     });
     expect(response.status).toBe(502);
+  });
+});
+
+describe("withGeminiFallback", () => {
+  const overloaded = () => new ApiError({ message: "high demand", status: 503 });
+
+  it("retries the main model once when it is overloaded", async () => {
+    const call = vi.fn().mockRejectedValueOnce(overloaded()).mockResolvedValueOnce("ok");
+    expect(await withGeminiFallback(["main", "backup"], call, 0)).toEqual({ model: "main", result: "ok" });
+    expect(call.mock.calls.map((c) => c[0])).toEqual(["main", "main"]);
+  });
+
+  it("falls back to the next model, then gives up", async () => {
+    const call = vi.fn().mockRejectedValueOnce(overloaded()).mockRejectedValueOnce(overloaded()).mockResolvedValueOnce("ok");
+    expect(await withGeminiFallback(["main", "backup"], call, 0)).toEqual({ model: "backup", result: "ok" });
+
+    const alwaysBusy = vi.fn().mockRejectedValue(overloaded());
+    await expect(withGeminiFallback(["main", "backup"], alwaysBusy, 0)).rejects.toMatchObject({ status: 503 });
+    expect(alwaysBusy).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not retry other errors", async () => {
+    const call = vi.fn().mockRejectedValue(new ApiError({ message: "bad key", status: 403 }));
+    await expect(withGeminiFallback(["main", "backup"], call, 0)).rejects.toMatchObject({ status: 403 });
+    expect(call).toHaveBeenCalledTimes(1);
   });
 });

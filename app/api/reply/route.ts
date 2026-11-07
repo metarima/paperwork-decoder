@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { anthropic, FAST_MODEL } from "@/lib/anthropic";
-import { gemini, GEMINI_FAST_MODEL } from "@/lib/gemini";
+import { gemini, GEMINI_FAST_FALLBACK, GEMINI_FAST_MODEL, withGeminiFallback } from "@/lib/gemini";
 import { replySystemPrompt } from "@/lib/prompts";
 import { getProvider } from "@/lib/provider";
 import { checkRateLimit, clientKey, rateLimitedResponse } from "@/lib/rate-limit";
@@ -28,13 +28,16 @@ export async function POST(request: Request) {
   }\n\nPlease draft the reply.`;
 
   if (getProvider() === "gemini") {
-    return geminiTextStreamResponse(() =>
-      gemini().models.generateContentStream({
-        model: GEMINI_FAST_MODEL,
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        config: { systemInstruction: system, maxOutputTokens: 4000 },
-      }),
-    );
+    return geminiTextStreamResponse(async () => {
+      const { result } = await withGeminiFallback([GEMINI_FAST_MODEL, GEMINI_FAST_FALLBACK], (model) =>
+        gemini().models.generateContentStream({
+          model,
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          config: { systemInstruction: system, maxOutputTokens: 4000 },
+        }),
+      );
+      return result;
+    });
   }
 
   const stream = anthropic.messages.stream({
