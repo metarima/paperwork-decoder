@@ -1,6 +1,6 @@
 # Paperwork Decoder
 
-Snap a photo of an official letter (a tax notice, a parking fine, a work contract, a landlord letter, an immigration appointment) and get back:
+Snap a photo of an official letter (a work contract, a tax notice, a parking fine, a landlord letter, an immigration appointment) and get back:
 
 - **What it means**, in plain language and in your language
 - **Deadlines**, with a one-click calendar export
@@ -41,7 +41,7 @@ Snap a photo of an official letter (a tax notice, a parking fine, a work contrac
 
 ## Evals
 
-`evals/cases.ts` has seven synthetic letters in Portuguese, English, German and Spanish (all names and numbers are made up). Each has known deadlines and amounts. `npm run eval` renders them through the real pipeline and scores the extraction.
+`evals/cases.ts` has eight synthetic letters in Portuguese, English, German and Spanish (all names and numbers are made up). Each has known deadlines and amounts. `npm run eval` renders them through the real pipeline and scores the extraction.
 
 <!-- TODO: paste the table from evals/results.md after running `npm run eval` -->
 

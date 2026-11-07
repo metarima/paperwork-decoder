@@ -5,8 +5,8 @@ export type CountryCode = "PT" | "GB" | "DE" | "ES";
 export type Sample = { id: string; title: string; short: string; country: CountryCode; countryName: string };
 
 export const SAMPLES: Sample[] = [
+  { id: "uk-employment-contract", title: "UK employment contract", short: "Work contract", country: "GB", countryName: "UK" },
   { id: "pt-property-tax", title: "Portuguese property tax notice", short: "Tax notice", country: "PT", countryName: "Portugal" },
   { id: "uk-parking-pcn", title: "UK parking fine", short: "Parking fine", country: "GB", countryName: "UK" },
-  { id: "pt-employment-contract", title: "Portuguese work contract", short: "Work contract", country: "PT", countryName: "Portugal" },
   { id: "de-broadcast-fee-reminder", title: "German payment reminder", short: "Reminder", country: "DE", countryName: "Germany" },
 ];

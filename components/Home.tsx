@@ -30,8 +30,8 @@ export function Hero() {
         Make sense of an official letter.
       </h1>
       <p className="mt-5 text-[17px] leading-relaxed text-muted text-pretty lg:text-[18px]">
-        Tax notices, fines, work contracts, letters from your landlord. Take a photo and see what it means, what you owe,
-        when it&apos;s due, and a reply you can send.
+        Work contracts, tax notices, fines, letters from your landlord. Take a photo and see what it means, what you owe
+        or earn, when it&apos;s due, and a reply you can send.
       </p>
     </div>
   );
@@ -222,21 +222,21 @@ const LETTER_TYPES: {
   isNew?: boolean;
 }[] = [
   {
+    type: "Work contracts",
+    phrase: "Statement of main terms of employment",
+    mark: "mark-date",
+    country: "GB",
+    language: "English",
+    gives: "Start date, pay, probation and notice period, and the clauses to check before you sign, like unpaid overtime or a non-compete.",
+    isNew: true,
+  },
+  {
     type: "Tax notices",
     phrase: "Nota de cobrança — IMI",
     mark: "mark-money",
     country: "PT",
     language: "Portuguese",
     gives: "What you owe, the payment references to use, and the date it's due.",
-  },
-  {
-    type: "Work contracts",
-    phrase: "Contrato de trabalho",
-    mark: "mark-date",
-    country: "PT",
-    language: "Portuguese",
-    gives: "Start date, pay, probation and notice period, and the clauses to check before you sign.",
-    isNew: true,
   },
   {
     type: "Fines and penalties",

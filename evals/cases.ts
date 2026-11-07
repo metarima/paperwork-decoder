@@ -243,4 +243,40 @@ Departamento de Recursos Humanos`,
       amounts: [{ value: 2150, currency: "EUR" }],
     },
   },
+  {
+    id: "uk-employment-contract",
+    title: "UK employment contract",
+    letter: {
+      letterhead: ["NORTHGATE ANALYTICS LTD (FICTIONAL)", "12 Example Street · Exampleford EX4 7QT"],
+      date: "3 November 2026",
+      body: `Mr S. Placeholder
+9 Sample Lane
+Exampleford EX3 8PL
+
+STATEMENT OF MAIN TERMS OF EMPLOYMENT
+
+This statement sets out the main terms on which Northgate Analytics Ltd ("the Company") employs you.
+
+1. Job title: Data Analyst.
+2. Start date: your employment begins on 1 December 2026. No previous employment counts towards your continuous employment.
+3. Probation: the first 6 months are a probationary period, during which either party may end your employment with one week's notice.
+4. Salary: £38,500 per year, paid monthly in arrears on the last working day of each month.
+5. Hours: 37.5 hours per week, Monday to Friday. You may be required to work additional hours without further pay where reasonably necessary.
+6. Holiday: 25 days per year plus bank holidays.
+7. Notice: after probation, you must give one month's notice. The Company will give you the statutory minimum notice.
+8. Restrictions: for 6 months after your employment ends, you must not work for a competitor within 25 miles of any Company office.
+9. Training costs: if you leave within 12 months of completing a qualification funded by the Company, you must repay its full cost.
+
+Please sign and return one copy by 20 November 2026 to confirm your acceptance. If we do not receive it by then, this offer may be withdrawn.
+
+Yours sincerely,
+People Team`,
+    },
+    expected: {
+      language: "English",
+      urgency: "medium",
+      deadlines: ["2026-11-20", "2026-12-01"],
+      amounts: [{ value: 38500, currency: "GBP" }],
+    },
+  },
 ];
