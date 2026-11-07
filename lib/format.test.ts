@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { daysUntil, formatMoney, keyDeadline, letterKey, maskSensitive, relativeDays, splitOnReferences } from "./format";
+import { daysUntil, formatDays, formatMoney, keyDeadline, letterKey, maskSensitive, relativeDays, splitOnReferences } from "./format";
 
 describe("daysUntil", () => {
   const today = new Date(2026, 8, 26, 15, 30);
@@ -19,7 +19,21 @@ describe("relativeDays", () => {
     expect(relativeDays(0)).toBe("today");
     expect(relativeDays(1)).toBe("tomorrow");
     expect(relativeDays(5)).toBe("in 5 days");
-    expect(relativeDays(-1)).toBe("1 day ago");
+    expect(relativeDays(-1)).toBe("yesterday");
+    expect(relativeDays(-7)).toBe("7 days ago");
+  });
+  it("follows the reader's language", () => {
+    expect(relativeDays(-7, "pt-PT")).toBe("há 7 dias");
+    expect(relativeDays(3, "de-DE")).toBe("in 3 Tagen");
+  });
+});
+
+describe("formatDays", () => {
+  it("pluralises per language", () => {
+    expect(formatDays(1)).toBe("1 day");
+    expect(formatDays(7)).toBe("7 days");
+    expect(formatDays(2, "uk-UA")).toBe("2 дні");
+    expect(formatDays(7, "uk-UA")).toBe("7 днів");
   });
 });
 
@@ -27,6 +41,7 @@ describe("formatMoney", () => {
   it("formats known currencies and falls back for unknown ones", () => {
     expect(formatMoney(312.4, "EUR")).toBe("€312.40");
     expect(formatMoney(10, "NOPE")).toBe("10.00 NOPE");
+    expect(formatMoney(312.4, "EUR", "pt-PT")).toBe("312,40 €");
   });
 });
 

@@ -17,6 +17,7 @@ export function propertyTax(deadlineInDays: number): LetterAnalysis {
     sender: "Serviço Municipal de Finanças de Vila Nova do Mar",
     letterType: "Property tax notice",
     language: "Portuguese",
+    languageCode: "pt",
     summary: "Your second property tax (IMI) payment for 2025 is due: pay €312.40 by the deadline.",
     explanation:
       "This is a payment notice from your local tax office for IMI, the yearly tax on property you own in Portugal. The 2025 tax is split into instalments, and this letter is about the second one.\n\nYou can pay at any Multibanco ATM, in your online banking (look for 'Pagamento de serviços' or 'Pagamentos ao Estado'), or at a CTT post office counter. You'll need the Entidade and Referência numbers below, and the exact amount.\n\nIf the payment doesn't arrive in time, the tax office starts a tax enforcement process (execução fiscal) and adds late-payment interest at the legal rate.",
@@ -47,11 +48,47 @@ export function propertyTax(deadlineInDays: number): LetterAnalysis {
   };
 }
 
+// The same notice explained in Portuguese, to preview the interface with
+// matching AI text (/preview?state=result&lang=pt).
+export function propertyTaxPt(deadlineInDays: number): LetterAnalysis {
+  return {
+    ...propertyTax(deadlineInDays),
+    letterType: "Nota de cobrança de IMI",
+    summary: "A segunda prestação do IMI de 2025 está a pagamento: tem de pagar 312,40 € até ao fim do prazo.",
+    explanation:
+      "Esta carta é uma nota de cobrança do serviço de finanças da sua zona sobre o IMI, o imposto anual sobre os imóveis que tem em Portugal. O imposto de 2025 foi dividido em prestações e esta carta diz respeito à segunda.\n\nPode pagar em qualquer caixa Multibanco, no homebanking (procure 'Pagamento de serviços' ou 'Pagamentos ao Estado') ou num balcão dos CTT. Vai precisar dos números de Entidade e Referência abaixo e do valor exato.\n\nSe o pagamento não chegar a tempo, as Finanças abrem um processo de execução fiscal e cobram juros de mora à taxa legal.",
+    deadlines: [{ date: isoFromToday(deadlineInDays), what: "Pagar a 2.ª prestação do IMI de 2025" }],
+    amounts: [{ value: 312.4, currency: "EUR", reason: "IMI 2025, 2.ª prestação" }],
+    actions: [
+      {
+        step: "Pagar 312,40 €",
+        how: "Num Multibanco ou no homebanking, escolha 'Pagamento de serviços' e introduza a Entidade 21312, a Referência 481 293 776 e o valor 312,40 €.",
+      },
+      { step: "Guardar o comprovativo", how: "Guarde o talão do Multibanco ou uma captura do comprovativo do banco até ao próximo ano." },
+      {
+        step: "Confirmar os dados do imóvel",
+        how: "Confirme que o imóvel (artigo 3471, fração B) é seu. Se não for, contacte as Finanças antes de pagar.",
+      },
+    ],
+    consequencesIfIgnored: "As Finanças abrem um processo de execução fiscal e acrescentam juros de mora ao valor em dívida.",
+  };
+}
+
+export const chatMessagesPt: { role: "user" | "assistant"; content: string }[] = [
+  { role: "user", content: "Posso pagar em prestações?" },
+  {
+    role: "assistant",
+    content:
+      "Esta carta já é uma prestação: o IMI de 2025 foi dividido e esta é a **segunda**. A carta não prevê dividir mais os 312,40 €.\n\nSe não conseguir pagar a tempo, contacte o serviço de finanças antes do fim do prazo e pergunte por um plano prestacional.",
+  },
+];
+
 export function blurryReminder(): LetterAnalysis {
   return {
     sender: "Beitragsservice Musterstadt",
     letterType: "Broadcast fee reminder",
     language: "German",
+    languageCode: "de",
     summary: "A reminder that your broadcast fee for July to September hasn't been paid. It looks like €55.08 is due.",
     explanation:
       "Germany charges every household a broadcast fee (Rundfunkbeitrag), whether or not you own a TV. This letter says the payment for July to September 2026 hasn't arrived.\n\nThe photo is blurred in the lower half, so the bank details and the amount of the late fee are hard to read. Compare them with the paper letter before you transfer anything.",

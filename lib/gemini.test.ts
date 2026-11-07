@@ -17,6 +17,7 @@ const analysis: LetterAnalysis = {
   sender: "Câmara Municipal",
   letterType: "Water bill",
   language: "Portuguese",
+  languageCode: "pt",
   summary: "You owe 42.10 EUR for water.",
   explanation: "This is your monthly water bill.",
   urgency: "medium",
@@ -45,7 +46,7 @@ describe("decodeLetter with Gemini", () => {
 
   it("sends the file inline with the JSON schema and returns validated output", async () => {
     generateContent.mockResolvedValue(reply({}));
-    const result = await decodeLetter("QUJD", "application/pdf", "English");
+    const result = await decodeLetter("QUJD", "application/pdf", "en");
 
     expect(result).toMatchObject({ ok: true, analysis, usage: { inputTokens: 1200, outputTokens: 350, costUsd: null } });
     const request = generateContent.mock.calls[0][0];

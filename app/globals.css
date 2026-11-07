@@ -25,10 +25,12 @@
   --medium-soft: #fdf3dc;
   --low: #2f5d50;
   --low-soft: #e3eee9;
-  --mark-money: #f9e3a6;
-  --mark-date: #cfe5db;
-  --mark-ref: #e6e1d6;
-  --mark-risk: #f6d3ce;
+  /* Highlighter inks: translucent, mixed from the urgency and accent hues so
+     they sit under the words rather than painting over them. */
+  --mark-money: color-mix(in oklab, #e3a72f 75%, transparent);
+  --mark-date: color-mix(in oklab, #4f9a80 70%, transparent);
+  --mark-ref: color-mix(in oklab, #a39a8a 65%, transparent);
+  --mark-risk: color-mix(in oklab, #df6d61 70%, transparent);
   --shadow-paper: 0 1px 2px rgb(60 50 30 / 0.06), 0 12px 32px -12px rgb(60 50 30 / 0.18);
   color-scheme: light;
 }
@@ -53,10 +55,10 @@
     --medium-soft: #372d17;
     --low: #8cc7b3;
     --low-soft: #22332d;
-    --mark-money: #5a4718;
-    --mark-date: #2c4a3f;
-    --mark-ref: #3b3a35;
-    --mark-risk: #5a2a26;
+    --mark-money: color-mix(in oklab, #e8c16b 75%, transparent);
+    --mark-date: color-mix(in oklab, #8cc7b3 70%, transparent);
+    --mark-ref: color-mix(in oklab, #a8a49b 55%, transparent);
+    --mark-risk: color-mix(in oklab, #f2a49c 70%, transparent);
     --shadow-paper: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 40px -16px rgb(0 0 0 / 0.6);
     color-scheme: dark;
   }
@@ -116,21 +118,70 @@ a {
   text-underline-offset: 3px;
 }
 
-/* Highlighter stroke: "pay attention to this". Used on the example letter and
-   on [placeholders] in drafted replies. */
+/* Marker underline: "pay attention to this". Used on the example letter and on
+   [placeholders] in drafted replies. A thick underline set just below the
+   baseline, so it wraps with the text and never crosses the letters. */
 .mark {
   --mark: var(--mark-ref);
-  background-image: linear-gradient(transparent 14%, var(--mark) 14%, var(--mark) 94%, transparent 94%);
-  padding-inline: 0.15em;
-  margin-inline: -0.05em;
-  border-radius: 2px;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
+  text-decoration-line: underline;
+  text-decoration-color: var(--mark);
+  text-decoration-thickness: max(2px, 0.2em);
+  text-underline-offset: 0.14em;
+  text-decoration-skip-ink: none;
 }
 .mark-money { --mark: var(--mark-money); }
 .mark-date { --mark: var(--mark-date); }
 .mark-ref { --mark: var(--mark-ref); }
 .mark-risk { --mark: var(--mark-risk); }
+
+/* The same marker, drawn in from the left when its paper comes to the front
+   of the letter stack on the home page. */
+.ink {
+  --mark: var(--mark-ref);
+  background-image: linear-gradient(var(--mark), var(--mark));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0% max(2px, 0.2em);
+  padding-bottom: 0.1em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: background-size 650ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+[data-front] .ink {
+  background-size: 100% max(2px, 0.2em);
+}
+.ink-money { --mark: var(--mark-money); }
+.ink-date { --mark: var(--mark-date); }
+.ink-ref { --mark: var(--mark-ref); }
+.ink-risk { --mark: var(--mark-risk); }
+
+/* The example letter lands tilted and squares up once it's on screen, then
+   lifts slightly when hovered. Live text only rests square, so it stays
+   sharp; the tilt lives in the motion and in the blank sheets behind. */
+.settle {
+  transform: translateY(14px) rotate(-4deg);
+  transition:
+    transform 1000ms cubic-bezier(0.16, 1, 0.3, 1) 150ms,
+    rotate 300ms ease-out,
+    translate 300ms ease-out;
+}
+.settle-card {
+  transform: translateY(20px);
+  transition: transform 900ms cubic-bezier(0.16, 1, 0.3, 1) 500ms;
+}
+[data-landed] .settle,
+[data-landed] .settle-card {
+  transform: none;
+}
+
+/* Floating panels (the language picker) grow out of their trigger. */
+@keyframes pop {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+.picker-pop {
+  animation: pop 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
 
 @keyframes spin {
   to { transform: rotate(360deg); }

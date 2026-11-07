@@ -4,17 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import { streamText } from "@/lib/client";
 import type { LetterAnalysis } from "@/lib/schema";
 import { ArrowUpIcon } from "./icons";
+import { useLocale } from "./LocaleContext";
 import { button, card, Spinner } from "./ui";
 
 export type Message = { role: "user" | "assistant"; content: string; error?: boolean };
-
-const SUGGESTIONS = ["Can I pay in instalments?", "What happens if I'm late?", "Is this letter legit?"];
 
 export default function FollowUpChat({ analysis, initialMessages = [] }: { analysis: LetterAnalysis; initialMessages?: Message[] }) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const { t, locale } = useLocale();
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -34,7 +34,7 @@ export default function FollowUpChat({ analysis, initialMessages = [] }: { analy
     abortRef.current = controller;
     const setAnswer = (content: string, error = false) => setMessages([...history, { role: "assistant", content, error }]);
     try {
-      await streamText("/api/chat", { analysis, messages: history }, (t) => setAnswer(t), controller.signal);
+      await streamText("/api/chat", { analysis, messages: history, locale }, (t) => setAnswer(t), controller.signal);
     } catch (e) {
       if (!controller.signal.aborted) setAnswer(e instanceof Error ? e.message : "Something went wrong.", true);
     } finally {
@@ -45,9 +45,9 @@ export default function FollowUpChat({ analysis, initialMessages = [] }: { analy
   return (
     <section id="ask" aria-labelledby="ask-title" className={`${card} scroll-mt-6 p-5 sm:p-6`}>
       <h2 id="ask-title" className="text-xl font-semibold tracking-[-0.01em]">
-        Ask about this letter
+        {t.chat.title}
       </h2>
-      <p className="mt-1 text-[15px] text-muted">Anything you&apos;re unsure about: what it means, what to do next.</p>
+      <p className="mt-1 text-[15px] text-muted">{t.chat.intro}</p>
 
       {messages.length > 0 && (
         <ol className="mt-5 space-y-3" aria-live="polite">
@@ -62,12 +62,12 @@ export default function FollowUpChat({ analysis, initialMessages = [] }: { analy
                       : "rounded-bl-md bg-surface-2"
                 }`}
               >
-                <span className="sr-only">{m.role === "user" ? "You: " : "Answer: "}</span>
+                <span className="sr-only">{m.role === "user" ? t.chat.you : t.chat.answer}</span>
                 {m.content ? (
                   withBold(m.content)
                 ) : (
                   <span className="inline-flex items-center gap-2 text-muted">
-                    <Spinner className="size-3.5" /> Thinking…
+                    <Spinner className="size-3.5" /> {t.chat.thinking}
                   </span>
                 )}
               </div>
@@ -78,7 +78,7 @@ export default function FollowUpChat({ analysis, initialMessages = [] }: { analy
 
       {messages.length === 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
-          {SUGGESTIONS.map((s) => (
+          {t.chat.suggestions.map((s) => (
             <button
               key={s}
               type="button"
@@ -99,7 +99,7 @@ export default function FollowUpChat({ analysis, initialMessages = [] }: { analy
         className="mt-5 flex gap-2"
       >
         <label className="sr-only" htmlFor="ask-input">
-          Your question
+          {t.chat.questionLabel}
         </label>
         <input
           id="ask-input"
@@ -107,12 +107,12 @@ export default function FollowUpChat({ analysis, initialMessages = [] }: { analy
           onChange={(e) => setInput(e.target.value)}
           maxLength={4000}
           autoComplete="off"
-          placeholder="e.g. Who do I call if I can't pay?"
+          placeholder={t.chat.placeholder}
           className="min-h-12 min-w-0 flex-1 rounded-xl border border-border-strong bg-surface px-3.5 text-[16px] placeholder:text-muted hover:border-accent"
         />
         <button type="submit" disabled={busy || !input.trim()} className={`${button.primary} px-4`}>
           <ArrowUpIcon size={18} />
-          Ask
+          {t.chat.ask}
         </button>
       </form>
     </section>

@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { anthropic, FAST_MODEL } from "@/lib/anthropic";
 import { gemini, GEMINI_FAST_FALLBACK, GEMINI_FAST_MODEL, withGeminiFallback } from "@/lib/gemini";
-import { CHAT_SYSTEM_PROMPT } from "@/lib/prompts";
+import { DEFAULT_LOCALE, LOCALE_CODES } from "@/lib/locales";
+import { chatSystemPrompt } from "@/lib/prompts";
 import { getProvider } from "@/lib/provider";
 import { checkRateLimit, clientKey, rateLimitedResponse } from "@/lib/rate-limit";
 import { LetterAnalysisSchema } from "@/lib/schema";
@@ -13,6 +14,7 @@ const ChatRequest = z.object({
     .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(4000) }))
     .min(1)
     .max(20),
+  locale: z.enum(LOCALE_CODES).default(DEFAULT_LOCALE),
 });
 
 export async function POST(request: Request) {
@@ -23,7 +25,8 @@ export async function POST(request: Request) {
   if (!parsed.success || parsed.data.messages[0].role !== "user") {
     return Response.json({ error: "Invalid request." }, { status: 400 });
   }
-  const { analysis, messages } = parsed.data;
+  const { analysis, messages, locale } = parsed.data;
+  const system = chatSystemPrompt(locale);
   const analysisText = `Letter analysis:\n${JSON.stringify(analysis, null, 2)}`;
 
   if (getProvider() === "gemini") {
@@ -32,7 +35,7 @@ export async function POST(request: Request) {
         gemini().models.generateContentStream({
           model,
           contents: messages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
-          config: { systemInstruction: `${CHAT_SYSTEM_PROMPT}\n\n${analysisText}`, maxOutputTokens: 2000 },
+          config: { systemInstruction: `${system}\n\n${analysisText}`, maxOutputTokens: 2000 },
         }),
       );
       return result;
@@ -45,7 +48,7 @@ export async function POST(request: Request) {
     // The analysis is identical for every turn of the conversation, so it sits
     // in the system prompt where it can be cached.
     system: [
-      { type: "text", text: CHAT_SYSTEM_PROMPT },
+      { type: "text", text: system },
       {
         type: "text",
         text: analysisText,

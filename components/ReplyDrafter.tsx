@@ -3,15 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { streamText } from "@/lib/client";
 import type { ReplyIntent } from "@/lib/prompts";
+import { languageName } from "@/lib/locales";
 import type { LetterAnalysis } from "@/lib/schema";
+import { capitalize, useLocale } from "./LocaleContext";
 import { button, card, CopyButton, Spinner } from "./ui";
 
-const INTENTS: { id: ReplyIntent; label: string; hint: string }[] = [
-  { id: "pay", label: "I'll pay", hint: "Confirm payment and ask for a receipt" },
-  { id: "dispute", label: "Dispute it", hint: "Say it's wrong and ask for a review" },
-  { id: "extension", label: "Ask for more time", hint: "Request a later deadline" },
-  { id: "info", label: "Ask a question", hint: "Ask them to explain something" },
-];
+const INTENTS: ReplyIntent[] = ["pay", "dispute", "extension", "info"];
 
 export type ReplyPreview = { intent: ReplyIntent; text: string; busy?: boolean };
 
@@ -22,6 +19,7 @@ export default function ReplyDrafter({ analysis, initial }: { analysis: LetterAn
   const [busy, setBusy] = useState(initial?.busy ?? false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const { t, locale, intl } = useLocale();
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -34,7 +32,7 @@ export default function ReplyDrafter({ analysis, initial }: { analysis: LetterAn
     setError(null);
     setBusy(true);
     try {
-      await streamText("/api/reply", { analysis, intent: chosen, notes: notes || undefined }, setText, controller.signal);
+      await streamText("/api/reply", { analysis, intent: chosen, notes: notes || undefined, locale }, setText, controller.signal);
     } catch (e) {
       if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
@@ -43,44 +41,44 @@ export default function ReplyDrafter({ analysis, initial }: { analysis: LetterAn
   }
 
   const [reply = "", translation] = text.split(/\n-{3,}\n/);
-  const sameLanguage = /^english$/i.test(analysis.language.trim());
+  // No translation pane when the letter is already in the reader's language.
+  const sameLanguage = analysis.languageCode.toLowerCase().split("-")[0] === locale;
+  const letterLang = languageName(analysis.languageCode, locale);
+  const readerLang = languageName(locale, locale);
   const hasPlaceholders = /\[[^\]]+\]/.test(reply);
 
   return (
     <section id="reply" aria-labelledby="reply-title" className={`${card} scroll-mt-6 p-5 sm:p-6`}>
       <h2 id="reply-title" className="text-xl font-semibold tracking-[-0.01em]">
-        Draft a reply
+        {t.reply.title}
       </h2>
-      <p className="mt-1 text-[15px] text-muted">
-        {sameLanguage
-          ? "A short, polite reply you can send as it is."
-          : `Written in ${analysis.language}, the letter's language, with an English translation for you.`}
-      </p>
+      <p className="mt-1 text-[15px] text-muted">{sameLanguage ? t.reply.introSame : t.reply.intro(letterLang, readerLang)}</p>
 
       <label className="mt-5 block">
         <span className="text-[15px] font-medium">
-          Anything they should know? <span className="font-normal text-muted">(optional)</span>
+          {t.reply.notesLabel} <span className="font-normal text-muted">{t.reply.optional}</span>
         </span>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           maxLength={1000}
           rows={2}
-          placeholder="e.g. I already paid on 3 October"
+          placeholder={t.reply.notesPlaceholder}
           className="mt-2 block w-full resize-y rounded-xl border border-border-strong bg-surface px-3.5 py-3 text-[16px] leading-snug placeholder:text-muted hover:border-accent"
         />
       </label>
 
       <fieldset className="mt-5">
-        <legend className="text-[15px] font-medium">What do you want to say?</legend>
+        <legend className="text-[15px] font-medium">{t.reply.whatToSay}</legend>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          {INTENTS.map((i) => {
-            const selected = intent === i.id;
+          {INTENTS.map((id) => {
+            const selected = intent === id;
+            const i = t.reply.intents[id];
             return (
               <button
-                key={i.id}
+                key={id}
                 type="button"
-                onClick={() => draft(i.id)}
+                onClick={() => draft(id)}
                 disabled={busy && !selected}
                 aria-pressed={selected}
                 className={`flex min-h-16 items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors disabled:opacity-50 ${
@@ -108,21 +106,21 @@ export default function ReplyDrafter({ analysis, initial }: { analysis: LetterAn
         <div className="mt-6 animate-rise" aria-live="polite" aria-busy={busy}>
           <div className={`grid gap-3 ${sameLanguage ? "" : "sm:grid-cols-2"}`}>
             <div className="flex flex-col rounded-xl border border-border-strong/60 bg-surface">
-              <div className="flex min-h-14 items-center justify-between gap-3 border-b border-border py-1.5 pr-1.5 pl-4">
+              <div className="flex min-h-14 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-border py-1.5 pr-1.5 pl-4">
                 <p className="text-sm">
-                  <span className="font-semibold">{analysis.language}</span>
-                  <span className="text-muted"> · to send</span>
+                  <span className="font-semibold">{capitalize(letterLang, intl)}</span>
+                  <span className="text-muted"> · {t.reply.toSend}</span>
                 </p>
                 {busy ? (
                   <span className="flex min-h-11 items-center gap-2 px-3 text-sm text-muted">
-                    <Spinner className="size-3.5" /> Writing…
+                    <Spinner className="size-3.5" /> {t.reply.writing}
                   </span>
                 ) : (
-                  <CopyButton value={reply.trim()} label="Copy reply" />
+                  <CopyButton value={reply.trim()} label={t.reply.copyReply} copiedLabel={t.copied} />
                 )}
               </div>
-              <div className="px-4 py-4 text-[15px] leading-relaxed whitespace-pre-wrap">
-                {reply ? withPlaceholders(reply.trim()) : <span className="text-muted">Starting…</span>}
+              <div lang={analysis.languageCode} className="px-4 py-4 text-[15px] leading-relaxed whitespace-pre-wrap">
+                {reply ? withPlaceholders(reply.trim()) : <span className="text-muted">{t.reply.starting}</span>}
               </div>
             </div>
 
@@ -130,15 +128,15 @@ export default function ReplyDrafter({ analysis, initial }: { analysis: LetterAn
               <div className="flex flex-col rounded-xl bg-surface-2">
                 <div className="flex min-h-14 items-center border-b border-border px-4">
                   <p className="text-sm">
-                    <span className="font-semibold">English</span>
-                    <span className="text-muted"> · for you to read</span>
+                    <span className="font-semibold">{capitalize(readerLang, intl)}</span>
+                    <span className="text-muted"> · {t.reply.forYou}</span>
                   </p>
                 </div>
                 <div className="px-4 py-4 text-[15px] leading-relaxed whitespace-pre-wrap">
                   {translation?.trim() ? (
                     withPlaceholders(translation.trim())
                   ) : (
-                    <span className="text-muted">The translation appears when the reply is written.</span>
+                    <span className="text-muted">{t.reply.translationPending}</span>
                   )}
                 </div>
               </div>
@@ -146,13 +144,13 @@ export default function ReplyDrafter({ analysis, initial }: { analysis: LetterAn
           </div>
           {!busy && hasPlaceholders && (
             <p className="mt-3 flex items-center gap-2 text-sm text-muted">
-              <span aria-hidden className="mark mark-money h-4 w-6" />
-              Fill in the highlighted parts before you send it.
+              <span aria-hidden className="h-1.5 w-5 shrink-0 rounded-full bg-mark-money" />
+              {t.reply.fillIn}
             </p>
           )}
           {!busy && intent && (
             <button type="button" onClick={() => draft(intent)} className={`${button.small} mt-4`}>
-              Write it again
+              {t.reply.writeAgain}
             </button>
           )}
         </div>

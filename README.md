@@ -7,8 +7,10 @@ Snap a photo of an official letter (a work contract, a tax notice, a parking fin
 - **What you owe**, and why
 - **What to do**, as a checklist, including the payment references from the letter
 - **What happens if you ignore it**
-- **A draft reply** in the letter's own language, with an English translation
+- **A draft reply** in the letter's own language, with a translation into yours
 - **A chat** for follow-up questions ("can I pay in instalments?")
+
+Results can be explained in English, Portuguese, Spanish, French, German, Italian or Ukrainian: the AI's answer, the reply translation, the chat and the result screens all follow that choice.
 
 **Live demo:** not hosted yet. For now you can [run it on your own computer](#install-on-your-pc) in a few minutes.
 

@@ -1,5 +1,6 @@
 import { apiErrorResponse } from "@/lib/provider";
 import { decodeLetter } from "@/lib/decode";
+import { DEFAULT_LOCALE, isLocale } from "@/lib/locales";
 import { checkRateLimit, clientKey, rateLimitedResponse } from "@/lib/rate-limit";
 import { isAcceptedType, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from "@/lib/schema";
 
@@ -11,7 +12,8 @@ export async function POST(request: Request) {
 
   const form = await request.formData();
   const file = form.get("file");
-  const explainIn = String(form.get("language") || "English").slice(0, 40);
+  const requested = form.get("language");
+  const explainIn = isLocale(requested) ? requested : DEFAULT_LOCALE;
 
   if (!(file instanceof File)) {
     return Response.json({ error: "No file uploaded." }, { status: 400 });

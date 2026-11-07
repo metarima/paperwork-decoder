@@ -6,6 +6,7 @@ const base: LetterAnalysis = {
   sender: "x",
   letterType: "x",
   language: "Portuguese (Portugal)",
+  languageCode: "pt",
   summary: "x",
   explanation: "x",
   urgency: "medium",

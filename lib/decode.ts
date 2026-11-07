@@ -4,6 +4,7 @@ import { FinishReason } from "@google/genai";
 import { z } from "zod";
 import { anthropic, DECODE_MODEL, estimateCostUsd } from "./anthropic";
 import { gemini, GEMINI_DECODE_FALLBACK, GEMINI_DECODE_MODEL, withGeminiFallback } from "./gemini";
+import { DEFAULT_LOCALE, type Locale } from "./locales";
 import { decodeSystemPrompt } from "./prompts";
 import { getProvider } from "./provider";
 import { type AcceptedType, type LetterAnalysis, LetterAnalysisSchema } from "./schema";
@@ -23,13 +24,13 @@ export type DecodeResult =
 const USER_PROMPT = "Here's the letter I received. What does it mean and what do I need to do?";
 
 // Shared by the API route and the eval runner so both exercise the same prompt.
-export async function decodeLetter(base64: string, mediaType: AcceptedType, explainIn = "English"): Promise<DecodeResult> {
+export async function decodeLetter(base64: string, mediaType: AcceptedType, explainIn: Locale = DEFAULT_LOCALE): Promise<DecodeResult> {
   return getProvider() === "gemini"
     ? decodeWithGemini(base64, mediaType, explainIn)
     : decodeWithClaude(base64, mediaType, explainIn);
 }
 
-async function decodeWithClaude(base64: string, mediaType: AcceptedType, explainIn: string): Promise<DecodeResult> {
+async function decodeWithClaude(base64: string, mediaType: AcceptedType, explainIn: Locale): Promise<DecodeResult> {
   const letter: Anthropic.ContentBlockParam =
     mediaType === "application/pdf"
       ? { type: "document", source: { type: "base64", media_type: mediaType, data: base64 } }
@@ -72,7 +73,7 @@ export function letterJsonSchema() {
 
 const BLOCKED: string[] = [FinishReason.SAFETY, FinishReason.PROHIBITED_CONTENT, FinishReason.BLOCKLIST, FinishReason.SPII];
 
-async function decodeWithGemini(base64: string, mediaType: AcceptedType, explainIn: string): Promise<DecodeResult> {
+async function decodeWithGemini(base64: string, mediaType: AcceptedType, explainIn: Locale): Promise<DecodeResult> {
   const started = Date.now();
   const { model, result: response } = await withGeminiFallback([GEMINI_DECODE_MODEL, GEMINI_DECODE_FALLBACK], (model) =>
     gemini().models.generateContent({

@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { Locale } from "@/lib/locales";
 import { type CountryCode, SAMPLES, type Sample } from "@/lib/samples";
 import { MAX_UPLOAD_MB } from "@/lib/schema";
 import Flag from "./Flag";
-import { CameraIcon, CheckIcon, ChevronIcon, CopyIcon, LockIcon, UploadIcon } from "./icons";
+import LanguagePicker from "./LanguagePicker";
+import LetterStack, { type Paper } from "./LetterStack";
+import { CalendarIcon, CameraIcon, CheckIcon, ChevronIcon, LockIcon, UploadIcon } from "./icons";
 import { button, card, PickButtons, useFilePicker } from "./ui";
-
-export const LANGUAGES = ["English", "Português", "Español", "Français", "Deutsch", "Italiano", "Українська"];
 
 export const HOME_LINKS = [
   { href: "#letters", label: "What it reads" },
@@ -17,8 +18,8 @@ export const HOME_LINKS = [
 
 type UploadProps = {
   busy: boolean;
-  language: string;
-  onLanguage: (language: string) => void;
+  language: Locale;
+  onLanguage: (language: Locale) => void;
   onFile: (file: File) => void;
   onSample: (sample: Sample) => void;
 };
@@ -59,6 +60,17 @@ export function UploadPanel({ busy, language, onLanguage, onFile, onSample }: Up
           if (file && !busy) onFile(file);
         }}
       >
+        {/* Asked first, so the choice is made before the upload starts. */}
+        <div className="mb-4 flex items-center gap-3 border-b border-border pb-4">
+          <div className="min-w-0 flex-1">
+            <p id="explain-in-label" className="text-[15px] font-medium">
+              Explain it in
+            </p>
+            <p className="text-sm text-muted">The letter itself can be in any language.</p>
+          </div>
+          <LanguagePicker value={language} onChange={onLanguage} labelledBy="explain-in-label" />
+        </div>
+
         {/* Touch screens: the camera is the main way in. */}
         <div className="hidden flex-col gap-3 pointer-coarse:flex">
           <button type="button" disabled={busy} onClick={openCamera} className={`${button.primary} min-h-16 text-[17px]`}>
@@ -92,23 +104,6 @@ export function UploadPanel({ busy, language, onLanguage, onFile, onSample }: Up
         </p>
         {inputs}
 
-        <div className="mt-4 border-t border-border pt-4">
-          <label className="flex items-center gap-3">
-            <span className="shrink-0 text-[15px] font-medium">Explain in</span>
-            <span className="relative flex-1 sm:max-w-56">
-              <select
-                value={language}
-                onChange={(e) => onLanguage(e.target.value)}
-                className="min-h-11 w-full appearance-none rounded-xl border border-border-strong bg-surface pr-10 pl-3.5 text-[15px] hover:border-accent"
-              >
-                {LANGUAGES.map((l) => (
-                  <option key={l}>{l}</option>
-                ))}
-              </select>
-              <ChevronIcon size={18} className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted" />
-            </span>
-          </label>
-        </div>
       </div>
 
       <div>
@@ -141,59 +136,88 @@ export function UploadPanel({ busy, language, onLanguage, onFile, onSample }: Up
 // parts that matter picked out in highlighter, and the plain-English reading
 // laid over it in the same colours.
 export function LetterPreview() {
+  // The letter lands tilted and squares up once it's on screen: the tilt is
+  // the motion, and the resting sheet is square so its text renders sharp.
+  const ref = useRef<HTMLElement>(null);
+  const [landed, setLanded] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setLanded(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.35 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <figure className="mx-auto w-full max-w-md lg:mx-0 lg:mt-3 lg:max-w-none">
+    <figure ref={ref} data-landed={landed || undefined} className="group/pile mx-auto w-full max-w-md lg:mx-0 lg:mt-3 lg:max-w-none">
       <div className="relative">
+        {/* Blank sheets fanned behind carry the tilt at rest, and spread a
+            little further when the pile is hovered. */}
         <div
           aria-hidden
-          className="relative -rotate-1 rounded-sm border border-border bg-surface px-5 pt-5 pb-24 font-serif text-[12.5px] leading-[1.6] text-foreground/80 shadow-paper sm:px-7 sm:pt-7 lg:text-[13.5px]"
+          className="absolute inset-x-1 top-3 bottom-16 translate-x-4 rotate-[5deg] rounded-[3px] border border-border bg-surface shadow-paper transition-[rotate,translate] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-fine:group-hover/pile:translate-x-6 pointer-fine:group-hover/pile:rotate-[7deg]"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-x-1 top-5 bottom-14 -translate-x-3.5 -rotate-[4deg] rounded-[3px] border border-border bg-surface shadow-paper transition-[rotate,translate] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-fine:group-hover/pile:-translate-x-5 pointer-fine:group-hover/pile:-rotate-[6deg]"
+        />
+        <div
+          aria-hidden
+          className="settle relative rounded-[3px] border border-border bg-surface px-5 pt-5 pb-24 font-serif text-[13.5px] leading-[1.6] text-foreground/85 shadow-paper sm:px-7 sm:pt-7 lg:text-[14.5px] pointer-fine:group-hover/pile:-translate-y-1 pointer-fine:group-hover/pile:-rotate-[1.2deg]"
         >
-          <p className="text-[10.5px] font-bold tracking-[0.12em] text-foreground lg:text-[11.5px]">SERVIÇO MUNICIPAL DE FINANÇAS</p>
-          <p className="text-[10.5px] tracking-wide">Vila Nova do Mar</p>
-          <p className="mt-3 text-right text-[11px]">Vila Nova do Mar, 15 de setembro de 2026</p>
-          <p className="mt-3 font-semibold text-foreground">Assunto: Nota de cobrança — IMI 2025, 2.ª prestação</p>
+          <p className="font-sans text-[11px] font-semibold tracking-[0.12em] text-foreground uppercase">Northgate Analytics Ltd</p>
+          <p className="text-[12px] text-muted">12 Example Street · Exampleford</p>
+          <p className="mt-3 text-right text-[12px] text-muted">3 November 2026</p>
+          <p className="mt-3 text-[15px] font-semibold text-foreground lg:text-[16px]">Statement of main terms of employment</p>
           <p className="mt-2">
-            Valor a pagar: <span className="mark mark-money font-semibold text-foreground">312,40 €</span>
+            2. Start date: your employment begins on <span className="mark mark-date text-foreground">1 December 2026</span>.
           </p>
-          <p className="mt-2">
-            O pagamento deverá ser efetuado até <span className="mark mark-date text-foreground">31 de outubro de 2026</span>, em
-            qualquer caixa multibanco, homebanking ou balcão dos CTT.
+          <p className="mt-1.5">
+            4. Salary: <span className="mark mark-money font-semibold text-foreground">£38,500 per year</span>, paid monthly in arrears.
           </p>
-          <p className="mt-2">
-            Entidade: <span className="mark mark-ref text-foreground">21312</span> &nbsp;Referência:{" "}
-            <span className="mark mark-ref text-foreground">481 293 776</span>
+          <p className="mt-1.5">
+            5. Hours: 37.5 per week. You may be required to work additional hours{" "}
+            <span className="mark mark-risk text-foreground">without further pay</span>.
           </p>
-          <p className="mt-2">
-            A falta de pagamento implica a instauração de{" "}
-            <span className="mark mark-risk text-foreground">processo de execução fiscal</span> e juros de mora.
+          <p className="mt-1.5">
+            8. Restrictions: for 6 months after you leave, <span className="mark mark-risk text-foreground">no competitor within 25 miles</span>.
+          </p>
+          <p className="mt-1.5">
+            Please sign and return one copy by <span className="mark mark-date text-foreground">20 November 2026</span>.
           </p>
         </div>
 
-        <div className={`${card} relative z-10 -mt-20 ml-4 p-4 shadow-paper sm:ml-10 sm:p-5`}>
+        <div className={`${card} settle-card relative z-10 -mt-20 ml-4 p-4 shadow-paper sm:ml-10 sm:p-5`}>
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
             <span className="rounded-full bg-medium-soft px-2 py-0.5 font-medium text-medium">Needs attention</span>
-            <span className="text-muted">Property tax · Portuguese</span>
+            <span className="text-muted">Work contract · English</span>
           </p>
           <p className="mt-2.5 text-[16px] leading-snug font-semibold text-balance lg:text-[17px]">
-            Your second property tax payment for 2025 is due.
+            A job offer from Northgate Analytics. Sign and return it by 20 November.
           </p>
           <ul className="mt-3 space-y-2 text-[14px] leading-snug">
             <PreviewRow mark="bg-mark-money">
-              You owe <strong className="font-semibold">€312.40</strong>
+              You&apos;d earn <strong className="font-semibold">£38,500 a year</strong>, paid monthly
             </PreviewRow>
             <PreviewRow mark="bg-mark-date">
-              Pay by <strong className="font-semibold">Sat 31 Oct 2026</strong>
+              Sign by <strong className="font-semibold">Fri 20 Nov</strong>, start <strong className="font-semibold">Tue 1 Dec 2026</strong>
             </PreviewRow>
-            <PreviewRow mark="bg-mark-ref">
-              At an ATM or in online banking, with Entidade <span className="font-mono">21312</span> and Referência{" "}
-              <span className="font-mono whitespace-nowrap">481 293 776</span>
+            <PreviewRow mark="bg-mark-risk">
+              Check before you sign: unpaid extra hours, and a 6-month ban on working for a competitor nearby.
             </PreviewRow>
-            <PreviewRow mark="bg-mark-risk">If you don&apos;t pay, the tax office opens an enforcement case and adds interest.</PreviewRow>
           </ul>
         </div>
       </div>
       <figcaption className="mt-4 text-center text-sm text-muted lg:ml-10 lg:text-left">
-        Example: a made-up Portuguese tax notice, decoded.
+        Example: a made-up UK employment contract, decoded.
       </figcaption>
     </figure>
   );
@@ -215,74 +239,132 @@ function PreviewRow({ mark, children }: { mark: string; children: React.ReactNod
 const LETTER_TYPES: {
   type: string;
   phrase: string;
-  mark: string;
   country: CountryCode;
   language: string;
   gives: string;
   isNew?: boolean;
+  paper: Pick<Paper, "head" | "place" | "lines">;
 }[] = [
   {
     type: "Work contracts",
     phrase: "Statement of main terms of employment",
-    mark: "mark-date",
     country: "GB",
     language: "English",
     gives: "Start date, pay, probation and notice period, and the clauses to check before you sign, like unpaid overtime or a non-compete.",
     isNew: true,
+    paper: {
+      head: "Northgate Analytics Ltd",
+      place: "Exampleford · 3 November 2026",
+      lines: [
+        ["Start date: ", { text: "1 December 2026", ink: "date" }],
+        ["Salary: ", { text: "£38,500 per year", ink: "money" }],
+        ["For 6 months after: ", { text: "no competitor within 25 miles", ink: "risk" }],
+      ],
+    },
   },
   {
     type: "Tax notices",
     phrase: "Nota de cobrança — IMI",
-    mark: "mark-money",
     country: "PT",
     language: "Portuguese",
     gives: "What you owe, the payment references to use, and the date it's due.",
+    paper: {
+      head: "Serviço Municipal de Finanças",
+      place: "Vila Nova do Mar · 15 de setembro de 2026",
+      lines: [
+        ["Valor a pagar: ", { text: "312,40 €", ink: "money" }],
+        ["Pagamento até ", { text: "31 de outubro de 2026", ink: "date" }],
+        ["Entidade ", { text: "21312", ink: "ref" }, " · Ref. ", { text: "481 293 776", ink: "ref" }],
+      ],
+    },
   },
   {
     type: "Fines and penalties",
     phrase: "Penalty Charge Notice",
-    mark: "mark-risk",
     country: "GB",
     language: "English",
     gives: "The reduced amount and how long it lasts, the full charge, and how to pay or challenge it.",
+    paper: {
+      head: "Borough of Exampleford",
+      place: "Parking Services · 22 September 2026",
+      lines: [
+        ["A charge of ", { text: "£70.00", ink: "money" }, " is now payable."],
+        ["£35.00 if paid by ", { text: "6 October 2026", ink: "date" }],
+        ["After 28 days it may rise to ", { text: "£105.00", ink: "risk" }],
+      ],
+    },
   },
   {
     type: "Landlords and tenancy",
     phrase: "Notice of rent increase",
-    mark: "mark-money",
     country: "GB",
     language: "English",
     gives: "The new rent, the date it starts, and what you can do if you disagree.",
+    paper: {
+      head: "Oakbridge Lettings",
+      place: "Exampleford · 1 September 2026",
+      lines: [
+        ["Current rent: £1,150.00 per month"],
+        ["From ", { text: "1 December 2026", ink: "date" }, ": ", { text: "£1,240.00", ink: "money" }],
+        ["You may challenge it ", { text: "at a tribunal", ink: "ref" }],
+      ],
+    },
   },
   {
     type: "Payment reminders",
     phrase: "Zahlungserinnerung",
-    mark: "mark-ref",
     country: "DE",
     language: "German",
     gives: "What's unpaid, any late fee, and the account and reference to pay with.",
+    paper: {
+      head: "Beitragsservice Musterstadt",
+      place: "Musterstadt · 18. September 2026",
+      lines: [
+        ["Offener Betrag: ", { text: "55,08 Euro", ink: "money" }],
+        ["Bitte überweisen bis zum ", { text: "15.10.2026", ink: "date" }],
+        ["Sonst: ", { text: "Säumniszuschlag 8,00 Euro", ink: "risk" }],
+      ],
+    },
   },
   {
     type: "Residence and appointments",
-    phrase: "Agendamento — autorização de residência",
-    mark: "mark-date",
+    phrase: "Convocatória — autorização de residência",
     country: "PT",
     language: "Portuguese",
     gives: "When and where to go, and the documents to bring with you.",
+    paper: {
+      head: "Agência de Migração",
+      place: "Vila Nova do Mar · 20 de setembro de 2026",
+      lines: [
+        ["Data: ", { text: "14 de outubro de 2026, 10h30", ink: "date" }],
+        ["Local: ", { text: "Balcão 3, Praça da Amostra", ink: "ref" }],
+        ["Taxa: ", { text: "90,00 €", ink: "money" }],
+      ],
+    },
   },
   {
     type: "Utility bills",
     phrase: "Factura del agua",
-    mark: "mark-ref",
     country: "ES",
     language: "Spanish",
     gives: "What the charges are for, the total, and when it's due.",
+    paper: {
+      head: "Aguas de Villaejemplo",
+      place: "Villaejemplo · 10 de septiembre de 2026",
+      lines: [
+        ["Consumo: 14 m³, julio y agosto"],
+        ["Importe total: ", { text: "48,73 €", ink: "money" }],
+        ["Se cargará el ", { text: "25/09/2026", ink: "date" }],
+      ],
+    },
   },
 ];
 
+const PAPERS: Paper[] = LETTER_TYPES.map((l) => ({ ...l.paper, subject: l.phrase, country: l.country, language: l.language }));
+
 function SectionHeading({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
-    <div className="lg:sticky lg:top-8 lg:self-start">
+    <div>
       <h2 id={id} className="text-[1.75rem] leading-tight font-semibold tracking-[-0.025em] text-balance lg:text-[2.125rem]">
         {title}
       </h2>
@@ -292,21 +374,66 @@ function SectionHeading({ id, title, children }: { id: string; title: string; ch
 }
 
 export function LettersSection() {
+  const [active, setActive] = useState(0);
+  const touched = useRef(false);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // Leaf through the pile on its own while the section is on screen, until
+  // the visitor points at a row. Never with reduced motion.
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        clearInterval(timer);
+        if (entry.isIntersecting && !touched.current) {
+          timer = setInterval(() => {
+            if (touched.current) clearInterval(timer);
+            else setActive((a) => (a + 1) % LETTER_TYPES.length);
+          }, 3200);
+        }
+      },
+      { threshold: 0.35 },
+    );
+    observer.observe(section);
+    return () => {
+      observer.disconnect();
+      clearInterval(timer);
+    };
+  }, []);
+
+  const pick = (i: number) => {
+    touched.current = true;
+    setActive(i);
+  };
+
   return (
-    <section id="letters" aria-labelledby="letters-title" className="scroll-mt-4 border-t border-border">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-20 lg:py-24">
-        <SectionHeading id="letters-title" title="The letters people bring">
-          Official paperwork in the language it was written in, explained in the one you choose.
-        </SectionHeading>
+    <section ref={sectionRef} id="letters" aria-labelledby="letters-title" className="scroll-mt-4 overflow-x-clip border-t border-border">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:gap-16 lg:py-24">
+        <div className="lg:sticky lg:top-8 lg:self-start">
+          <SectionHeading id="letters-title" title="The letters people bring">
+            Official paperwork in the language it was written in, explained in the one you choose.
+          </SectionHeading>
+          <div className="mt-10 px-3 pt-6 lg:mt-12 lg:px-0">
+            <LetterStack papers={PAPERS} active={active} />
+          </div>
+        </div>
         <ul className="border-t border-border">
-          {LETTER_TYPES.map((l) => (
+          {LETTER_TYPES.map((l, i) => (
             <li
               key={l.type}
+              onMouseEnter={() => pick(i)}
+              onClick={() => pick(i)}
               className="grid gap-x-8 gap-y-3 border-b border-border py-5 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] sm:py-6"
             >
               <div>
-                <p className="font-serif text-[17px] leading-snug">
-                  <span className={`mark ${l.mark}`}>{l.phrase}</span>
+                <p
+                  className={`font-serif text-[17px] leading-snug text-pretty transition-colors duration-300 ${
+                    active === i ? "text-foreground" : "text-muted"
+                  }`}
+                >
+                  &ldquo;{l.phrase}&rdquo;
                 </p>
                 <p className="mt-1.5 flex items-center gap-2 text-[13px] text-muted">
                   <Flag country={l.country} className="h-[11px] w-4" />
@@ -342,7 +469,7 @@ export function HowSection() {
     },
     {
       title: "Deal with it",
-      body: "Tick off the steps, copy the payment references, add the deadline to your calendar, and draft a reply in the letter's language.",
+      body: "Tick off the steps, copy any payment references, add the deadline to your calendar, and draft a reply in the letter's language.",
       fragment: <ActFragment />,
     },
   ];
@@ -404,13 +531,14 @@ function StripFragment() {
       </div>
       <div className="grid grid-cols-2 divide-x divide-border">
         <div className="px-3 py-2.5">
-          <p className="text-[12px] text-muted">How much</p>
-          <p className="text-[17px] font-semibold tabular-nums">€312.40</p>
+          <p className="text-[12px] text-muted">Salary</p>
+          <p className="text-[17px] font-semibold tabular-nums">£38,500</p>
+          <p className="text-[12px] text-muted">a year</p>
         </div>
         <div className="px-3 py-2.5">
-          <p className="text-[12px] text-muted">By when</p>
-          <p className="text-[15px] font-semibold">Sat 31 Oct</p>
-          <p className="text-[12px] text-muted">in 12 days</p>
+          <p className="text-[12px] text-muted">Sign by</p>
+          <p className="text-[15px] font-semibold">Fri 20 Nov</p>
+          <p className="text-[12px] text-muted">starts 1 Dec</p>
         </div>
       </div>
     </div>
@@ -420,20 +548,19 @@ function StripFragment() {
 function ActFragment() {
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-3 rounded-xl bg-surface-2 py-2 pr-2 pl-3.5">
-        <div className="min-w-0 flex-1">
-          <p className="text-[12px] text-muted">Referência</p>
-          <p className="font-mono text-[15px]">481 293 776</p>
-        </div>
-        <span className="flex size-10 items-center justify-center rounded-xl border border-border-strong bg-surface">
-          <CopyIcon size={17} />
-        </span>
-      </div>
       <div className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3">
         <span className="flex size-5 items-center justify-center rounded-md bg-accent text-on-accent">
           <CheckIcon size={14} />
         </span>
-        <span className="text-[14px] font-semibold text-muted line-through">Pay €312.40</span>
+        <span className="text-[14px] font-semibold text-muted line-through">Read the non-compete clause</span>
+      </div>
+      <div className="flex items-center gap-3 rounded-xl border border-border bg-surface px-3.5 py-3">
+        <span className="size-5 rounded-md border-[1.5px] border-border-strong" />
+        <span className="text-[14px] font-semibold">Sign and return by 20 Nov</span>
+      </div>
+      <div className="flex min-h-10 items-center justify-center gap-2 rounded-xl border border-border-strong bg-surface text-[13px] font-medium">
+        <CalendarIcon size={16} />
+        Add to calendar
       </div>
     </div>
   );
@@ -461,10 +588,12 @@ const PRIVACY = [
 export function PrivacySection() {
   return (
     <section id="privacy" aria-labelledby="privacy-title" className="scroll-mt-4">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-20 lg:py-24">
-        <SectionHeading id="privacy-title" title="Careful with your paperwork">
-          Official letters carry names, addresses and account numbers. Here is what happens to yours.
-        </SectionHeading>
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:gap-16 lg:py-24">
+        <div className="lg:sticky lg:top-8 lg:self-start">
+          <SectionHeading id="privacy-title" title="Careful with your paperwork">
+            Official letters carry names, addresses and account numbers. Here is what happens to yours.
+          </SectionHeading>
+        </div>
         <dl className="grid gap-x-10 sm:grid-cols-2">
           {PRIVACY.map((p) => (
             <div key={p.title} className="border-t border-border pt-5 pb-8">

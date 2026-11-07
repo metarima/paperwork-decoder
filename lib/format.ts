@@ -1,15 +1,19 @@
-export function formatMoney(value: number, currency: string) {
+// Formatting follows the reader's locale (an Intl tag such as "pt-PT").
+// en-GB is the default so the home page and tests read the same as before.
+const DEFAULT_INTL = "en-GB";
+
+export function formatMoney(value: number, currency: string, intl = DEFAULT_INTL) {
   try {
-    return new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(value);
+    return new Intl.NumberFormat(intl, { style: "currency", currency }).format(value);
   } catch {
     return `${value.toFixed(2)} ${currency}`;
   }
 }
 
-export function formatDate(iso: string) {
+export function formatDate(iso: string, intl = DEFAULT_INTL) {
   const date = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+  return date.toLocaleDateString(intl, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 }
 
 // Whole days from today until an ISO date (negative if it has passed).
@@ -20,11 +24,15 @@ export function daysUntil(iso: string, today = new Date()) {
   return Math.round((target.getTime() - start.getTime()) / 86_400_000);
 }
 
-export function relativeDays(days: number) {
-  if (days < 0) return `${-days} day${days === -1 ? "" : "s"} ago`;
-  if (days === 0) return "today";
-  if (days === 1) return "tomorrow";
-  return `in ${days} days`;
+// "in 5 days", "yesterday", "há 7 dias", "7 днів тому": grammar and plurals
+// come from Intl, so every language gets them right.
+export function relativeDays(days: number, intl = DEFAULT_INTL) {
+  return new Intl.RelativeTimeFormat(intl, { numeric: "auto" }).format(days, "day");
+}
+
+// A count of days with its unit, e.g. "7 days", "1 dia", "2 дні".
+export function formatDays(count: number, intl = DEFAULT_INTL) {
+  return new Intl.NumberFormat(intl, { style: "unit", unit: "day", unitDisplay: "long" }).format(count);
 }
 
 // Masks long account-like numbers (IBANs, tax IDs) except their last 4 chars,
