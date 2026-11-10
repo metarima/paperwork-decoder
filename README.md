@@ -12,7 +12,7 @@ Snap a photo of an official letter (a work contract, a tax notice, a parking fin
 
 Results can be explained in English, Portuguese, Spanish, French, German, Italian or Ukrainian: the AI's answer, the reply translation, the chat and the result screens all follow that choice.
 
-**Live demo:** not hosted yet. For now you can [run it on your own computer](#install-on-your-pc) in a few minutes.
+**Live demo:** [paperwork-decoder.vercel.app](https://paperwork-decoder.vercel.app). Try a sample letter or upload your own. You can also [run it on your own computer](#install-on-your-pc) in a few minutes.
 
 <!-- TODO: demo GIF -->
 
@@ -102,7 +102,7 @@ Open [http://localhost:3000](http://localhost:3000) and try one of the sample le
 
 ## Hosting
 
-Not hosted yet. The app is ready for [Vercel](https://vercel.com); the plan when it goes live:
+The live demo runs on [Vercel](https://vercel.com)'s free plan at [paperwork-decoder.vercel.app](https://paperwork-decoder.vercel.app). To deploy your own copy:
 
 1. Run `npm run eval -- --cache` once and commit the generated `public/samples/*.json`, so the sample letters load instantly and cost nothing.
 2. Import the repo in Vercel and set `GEMINI_API_KEY` (or `ANTHROPIC_API_KEY`) under Project Settings > Environment Variables.
